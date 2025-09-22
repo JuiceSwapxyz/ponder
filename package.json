@@ -10,7 +10,8 @@
     "codegen": "ponder codegen",
     "build": "ponder build",
     "api": "tsx src/api/index.ts",
-    "api:dev": "tsx watch src/api/index.ts"
+    "api:dev": "tsx watch src/api/index.ts",
+    "test": "echo \"Warning: no test specified\" && exit 0"
   },
   "repository": {
     "type": "git",

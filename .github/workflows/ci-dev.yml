@@ -2,9 +2,9 @@ name: JuiceSwap Ponder DEV CI/CD
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, main]  # Also trigger on main for now
   pull_request:
-    branches: [develop]
+    branches: [develop, main]
   workflow_dispatch:
 
 env:
@@ -83,7 +83,7 @@ jobs:
     name: Deploy to Development
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
     environment: development
     steps:
       - name: Deploy notification
