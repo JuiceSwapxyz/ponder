@@ -9,6 +9,9 @@ import type {
   CampaignToken,
 } from "./types";
 
+// Track processed transactions to avoid duplicates
+const processedTxns = new Set<string>();
+
 // Multi-Chain Campaign Token Mapping
 const CAMPAIGN_TOKENS: Record<number, Record<string, CampaignToken>> = {
   // Citrea Testnet
@@ -63,78 +66,147 @@ const KNOWN_ROUTERS: Record<number, string[]> = {
   ]
 };
 
-// Track swap transactions from router calls (temporarily disabled for testing)
-// ponder.on("JuiceSwapRouter02_CitreaTestnet:swapExactETHForTokens", async ({ event, context }) => {
-//   const { client, db } = context;
+// Track swap transactions from router calls
+// For now, we don't have specific events from the routers
+// We'll rely on Transfer events from the tokens to track swaps
 
-//   try {
-//     // Get transaction receipt to find Transfer events
-//     const receipt = await client.getTransactionReceipt({
-//       hash: event.transaction.hash
-//     });
+// Token Transfer event handlers with swap detection logic
+// Since routers don't emit events, we detect swaps from token transfers
 
-//     const swapData = await analyzeSwapTransaction(receipt, event, context, 5115);
-
-//     if (swapData) {
-//       await processSwap(swapData, context);
-//     }
-//   } catch (error) {
-//     console.error("Error processing router call:", error);
-//   }
-// });
-
-// ponder.on("JuiceSwapRouter_CitreaTestnet:swapExactETHForTokens", async ({ event, context }) => {
-//   const { client, db } = context;
-
-//   try {
-//     const receipt = await client.getTransactionReceipt({
-//       hash: event.transaction.hash
-//     });
-
-//     const swapData = await analyzeSwapTransaction(receipt, event, context, 5115);
-
-//     if (swapData) {
-//       await processSwap(swapData, context);
-//     }
-//   } catch (error) {
-//     console.error("Error processing router call:", error);
-//   }
-// });
-
-// ponder.on("JuiceSwapRouterAlt_CitreaTestnet:swapExactETHForTokens", async ({ event, context }) => {
-//   const { client, db } = context;
-
-//   try {
-//     const receipt = await client.getTransactionReceipt({
-//       hash: event.transaction.hash
-//     });
-
-//     const swapData = await analyzeSwapTransaction(receipt, event, context, 5115);
-
-//     if (swapData) {
-//       await processSwap(swapData, context);
-//     }
-//   } catch (error) {
-//     console.error("Error processing router call:", error);
-//   }
-// });
-
-// Token Transfer event handlers
-// For now, we just track Transfer events but don't process them
-// Token metadata is handled in the campaign token mapping
+// Token Transfer event handlers - Detect and process swaps
 ponder.on("NUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
-  // Transfer events are tracked but not processed
-  // Token info is available in CAMPAIGN_TOKENS mapping
+  const { db, block } = context;
+
+  // Check if this transaction involves a known router
+  const txTo = event.transaction.to ? getAddress(event.transaction.to) : null;
+  const isRouterTx = txTo && KNOWN_ROUTERS[5115]?.some(router => isAddressEqual(txTo, router));
+
+  // Skip if we've already processed this transaction
+  if (processedTxns.has(event.transaction.hash)) {
+    return;
+  }
+
+  // Process if this is a router transaction or if value was sent (native token swap)
+  if (isRouterTx || event.transaction.value > 0n) {
+    processedTxns.add(event.transaction.hash);
+    try {
+      // Create simplified swap data from the Transfer event
+      const swapData = {
+        txHash: event.transaction.hash,
+        chainId: 5115,
+        blockNumber: BigInt(block.number),
+        blockTimestamp: BigInt(block.timestamp),
+        from: getAddress(event.transaction.from),
+        to: txTo || ("0x0000000000000000000000000000000000000000" as Address),
+        tokenIn: event.transaction.value > 0n ? ("0x0000000000000000000000000000000000000000" as Address) : getAddress(event.args.from),
+        tokenOut: getAddress(event.log.address),
+        amountIn: event.transaction.value > 0n ? event.transaction.value : 0n,
+        amountOut: BigInt(event.args.value),
+        router: txTo || ("0x0000000000000000000000000000000000000000" as Address),
+        methodSignature: event.transaction.input.slice(0, 10),
+      };
+
+      // Check if this is a swap to NUSD from native token
+      const isCampaignRelevant = event.transaction.value > 0n &&
+        CAMPAIGN_TOKENS[5115]?.[event.log.address.toLowerCase()];
+
+      if (isCampaignRelevant) {
+        await processSwap(swapData, context);
+      }
+    } catch (error) {
+      console.error("Error processing NUSD transfer:", error);
+    }
+  }
 });
 
 ponder.on("cUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
-  // Transfer events are tracked but not processed
-  // Token info is available in CAMPAIGN_TOKENS mapping
+  const { db, block } = context;
+
+  // Check if this transaction involves a known router
+  const txTo = event.transaction.to ? getAddress(event.transaction.to) : null;
+  const isRouterTx = txTo && KNOWN_ROUTERS[5115]?.some(router => isAddressEqual(txTo, router));
+
+  // Skip if we've already processed this transaction
+  if (processedTxns.has(event.transaction.hash)) {
+    return;
+  }
+
+  // Process if this is a router transaction or if value was sent (native token swap)
+  if (isRouterTx || event.transaction.value > 0n) {
+    processedTxns.add(event.transaction.hash);
+    try {
+      // Create simplified swap data from the Transfer event
+      const swapData = {
+        txHash: event.transaction.hash,
+        chainId: 5115,
+        blockNumber: BigInt(block.number),
+        blockTimestamp: BigInt(block.timestamp),
+        from: getAddress(event.transaction.from),
+        to: txTo || ("0x0000000000000000000000000000000000000000" as Address),
+        tokenIn: event.transaction.value > 0n ? ("0x0000000000000000000000000000000000000000" as Address) : getAddress(event.args.from),
+        tokenOut: getAddress(event.log.address),
+        amountIn: event.transaction.value > 0n ? event.transaction.value : 0n,
+        amountOut: BigInt(event.args.value),
+        router: txTo || ("0x0000000000000000000000000000000000000000" as Address),
+        methodSignature: event.transaction.input.slice(0, 10),
+      };
+
+      // Check if this is a swap to cUSD from native token
+      const isCampaignRelevant = event.transaction.value > 0n &&
+        CAMPAIGN_TOKENS[5115]?.[event.log.address.toLowerCase()];
+
+      if (isCampaignRelevant) {
+        await processSwap(swapData, context);
+      }
+    } catch (error) {
+      console.error("Error processing cUSD transfer:", error);
+    }
+  }
 });
 
 ponder.on("USDC_CitreaTestnet:Transfer", async ({ event, context }) => {
-  // Transfer events are tracked but not processed
-  // Token info is available in CAMPAIGN_TOKENS mapping
+  const { db, block } = context;
+
+  // Check if this transaction involves a known router
+  const txTo = event.transaction.to ? getAddress(event.transaction.to) : null;
+  const isRouterTx = txTo && KNOWN_ROUTERS[5115]?.some(router => isAddressEqual(txTo, router));
+
+  // Skip if we've already processed this transaction
+  if (processedTxns.has(event.transaction.hash)) {
+    return;
+  }
+
+  // Process if this is a router transaction or if value was sent (native token swap)
+  if (isRouterTx || event.transaction.value > 0n) {
+    processedTxns.add(event.transaction.hash);
+    try {
+      // Create simplified swap data from the Transfer event
+      const swapData = {
+        txHash: event.transaction.hash,
+        chainId: 5115,
+        blockNumber: BigInt(block.number),
+        blockTimestamp: BigInt(block.timestamp),
+        from: getAddress(event.transaction.from),
+        to: txTo || ("0x0000000000000000000000000000000000000000" as Address),
+        tokenIn: event.transaction.value > 0n ? ("0x0000000000000000000000000000000000000000" as Address) : getAddress(event.args.from),
+        tokenOut: getAddress(event.log.address),
+        amountIn: event.transaction.value > 0n ? event.transaction.value : 0n,
+        amountOut: BigInt(event.args.value),
+        router: txTo || ("0x0000000000000000000000000000000000000000" as Address),
+        methodSignature: event.transaction.input.slice(0, 10),
+      };
+
+      // Check if this is a swap to USDC from native token
+      const isCampaignRelevant = event.transaction.value > 0n &&
+        CAMPAIGN_TOKENS[5115]?.[event.log.address.toLowerCase()];
+
+      if (isCampaignRelevant) {
+        await processSwap(swapData, context);
+      }
+    } catch (error) {
+      console.error("Error processing USDC transfer:", error);
+    }
+  }
 });
 
 // ========================================
@@ -192,9 +264,9 @@ ponder.on("USDC_CitreaTestnet:Transfer", async ({ event, context }) => {
 
 // Helper Functions
 async function analyzeSwapTransaction(
-  receipt: TransactionReceipt,
-  event: TransactionEvent,
-  context: PonderContext,
+  receipt: any,
+  transaction: any,
+  context: any,
   chainId: number
 ): Promise<SwapAnalysisResult | null> {
   const { block } = context;
@@ -207,7 +279,7 @@ async function analyzeSwapTransaction(
   if (transferEvents.length < 2) return null;
 
   // Analyze transfer pattern to identify swap
-  const from = event.transaction.from;
+  const from = transaction.from;
   let tokenIn: string | null = null;
   let tokenOut: string | null = null;
   let amountIn = 0n;
@@ -234,30 +306,30 @@ async function analyzeSwapTransaction(
   }
 
   // Check if this involves native token (ETH/cBTC/etc.)
-  if (event.transaction.value > 0n) {
+  if (transaction.value > 0n) {
     tokenIn = "0x0000000000000000000000000000000000000000"; // Native token
-    amountIn = event.transaction.value;
+    amountIn = transaction.value;
   }
 
   if (!tokenOut) return null;
 
   return {
-    txHash: event.transaction.hash,
+    txHash: transaction.hash,
     chainId,
     blockNumber: BigInt(block.number),
     blockTimestamp: BigInt(block.timestamp),
     from: getAddress(from),
-    to: getAddress(event.transaction.to || "0x0"),
+    to: getAddress(transaction.to || "0x0"),
     tokenIn: tokenIn ? getAddress(tokenIn) : ("0x0000000000000000000000000000000000000000" as Address),
     tokenOut: getAddress(tokenOut),
     amountIn,
     amountOut,
-    router: getAddress(event.transaction.to || "0x0"),
-    methodSignature: event.transaction.input.slice(0, 10),
+    router: getAddress(transaction.to || "0x0"),
+    methodSignature: transaction.input.slice(0, 10),
   };
 }
 
-async function processSwap(swapData: SwapAnalysisResult, context: PonderContext): Promise<void> {
+async function processSwap(swapData: any, context: any): Promise<void> {
   const { db } = context;
 
   // Check if this is a campaign-relevant swap

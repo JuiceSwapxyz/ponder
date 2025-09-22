@@ -27,29 +27,6 @@ export default createConfig({
     },
   },
   contracts: {
-    // CITREA TESTNET - JuiceSwap V3 Routers (temporarily disabled for testing)
-    // JuiceSwapRouter02_CitreaTestnet: {
-    //   network: "citreaTestnet",
-    //   address: "0x610c98EAD0df13EA906854b6041122e8A8D14413",
-    //   abi: SwapRouter02Abi,
-    //   startBlock: 15455029,
-    //   includeCallTraces: true,
-    // },
-    // JuiceSwapRouter_CitreaTestnet: {
-    //   network: "citreaTestnet",
-    //   address: "0xb2A4E33e9A9aC7c46045A2D0318a4F50194dafDE",
-    //   abi: SwapRouter02Abi,
-    //   startBlock: 15455029,
-    //   includeCallTraces: true,
-    // },
-    // JuiceSwapRouterAlt_CitreaTestnet: {
-    //   network: "citreaTestnet",
-    //   address: "0x3012E9049d05B4B5369D690114D5A5861EbB85cb",
-    //   abi: SwapRouter02Abi,
-    //   startBlock: 15455029,
-    //   includeCallTraces: true,
-    // },
-
     // CITREA TESTNET - Campaign Target Tokens
     NUSD_CitreaTestnet: {
       network: "citreaTestnet",
