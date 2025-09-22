@@ -48,7 +48,7 @@ const SWAP_EVENT_SIGNATURE = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fe
 // ========================================
 
 // CBTC/NUSD Pool Swap Handler (Task 1)
-ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
+ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }: any) => {
   const { db } = context;
 
   // Skip if we've already processed this transaction
@@ -195,7 +195,7 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
 });
 
 // CBTC/cUSD Pool Swap Handler (Task 2)
-ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
+ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }: any) => {
   const { db } = context;
 
   // Skip if we've already processed this transaction
@@ -342,7 +342,7 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
 });
 
 // CBTC/USDC Pool Swap Handler (Task 3)
-ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
+ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }: any) => {
   const { db } = context;
 
   // Skip if we've already processed this transaction
