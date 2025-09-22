@@ -31,6 +31,8 @@ services:
     #   - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Mount initialization scripts that fix permissions
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     restart: unless-stopped
     env_file:
       - .env
