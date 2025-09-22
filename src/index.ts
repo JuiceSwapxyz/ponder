@@ -91,26 +91,25 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }: any) => 
     const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
     const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
 
-    // Store swap record - create clean data object
-    const swapRecord = {
-      id: swapData.txHash,
-      txHash: swapData.txHash,
-      chainId: swapData.chainId,
-      blockNumber: swapData.blockNumber,
-      blockTimestamp: swapData.blockTimestamp,
-      from: swapData.sender,
-      to: swapData.recipient,
-      tokenIn: swapData.poolAddress,
-      tokenOut: swapData.poolAddress,
-      amountIn,
-      amountOut,
-      router: swapData.router,
-      methodSignature: swapData.methodSignature,
-      isCampaignRelevant,
-      campaignTaskId: campaignPool?.taskId,
-    };
+    // Store swap record directly with clean primitive values
 
-    await db.insert("swap").values(swapRecord);
+    await db.insert("swap").values({
+      id: String(swapData.txHash),
+      txHash: String(swapData.txHash),
+      chainId: Number(swapData.chainId),
+      blockNumber: BigInt(String(swapData.blockNumber)),
+      blockTimestamp: BigInt(String(swapData.blockTimestamp)),
+      from: String(swapData.sender),
+      to: String(swapData.recipient),
+      tokenIn: String(swapData.poolAddress),
+      tokenOut: String(swapData.poolAddress),
+      amountIn: BigInt(String(amountIn)),
+      amountOut: BigInt(String(amountOut)),
+      router: String(swapData.router),
+      methodSignature: String(swapData.methodSignature),
+      isCampaignRelevant: Boolean(isCampaignRelevant),
+      campaignTaskId: campaignPool?.taskId ? Number(campaignPool.taskId) : null,
+    });
 
     // If campaign relevant, process task completion
     if (isCampaignRelevant && campaignPool) {
@@ -238,26 +237,25 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }: any) => 
     const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
     const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
 
-    // Store swap record - create clean data object
-    const swapRecord = {
-      id: swapData.txHash,
-      txHash: swapData.txHash,
-      chainId: swapData.chainId,
-      blockNumber: swapData.blockNumber,
-      blockTimestamp: swapData.blockTimestamp,
-      from: swapData.sender,
-      to: swapData.recipient,
-      tokenIn: swapData.poolAddress,
-      tokenOut: swapData.poolAddress,
-      amountIn,
-      amountOut,
-      router: swapData.router,
-      methodSignature: swapData.methodSignature,
-      isCampaignRelevant,
-      campaignTaskId: campaignPool?.taskId,
-    };
+    // Store swap record directly with clean primitive values
 
-    await db.insert("swap").values(swapRecord);
+    await db.insert("swap").values({
+      id: String(swapData.txHash),
+      txHash: String(swapData.txHash),
+      chainId: Number(swapData.chainId),
+      blockNumber: BigInt(String(swapData.blockNumber)),
+      blockTimestamp: BigInt(String(swapData.blockTimestamp)),
+      from: String(swapData.sender),
+      to: String(swapData.recipient),
+      tokenIn: String(swapData.poolAddress),
+      tokenOut: String(swapData.poolAddress),
+      amountIn: BigInt(String(amountIn)),
+      amountOut: BigInt(String(amountOut)),
+      router: String(swapData.router),
+      methodSignature: String(swapData.methodSignature),
+      isCampaignRelevant: Boolean(isCampaignRelevant),
+      campaignTaskId: campaignPool?.taskId ? Number(campaignPool.taskId) : null,
+    });
 
     // If campaign relevant, process task completion
     if (isCampaignRelevant && campaignPool) {
@@ -385,26 +383,25 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }: any) => 
     const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
     const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
 
-    // Store swap record - create clean data object
-    const swapRecord = {
-      id: swapData.txHash,
-      txHash: swapData.txHash,
-      chainId: swapData.chainId,
-      blockNumber: swapData.blockNumber,
-      blockTimestamp: swapData.blockTimestamp,
-      from: swapData.sender,
-      to: swapData.recipient,
-      tokenIn: swapData.poolAddress,
-      tokenOut: swapData.poolAddress,
-      amountIn,
-      amountOut,
-      router: swapData.router,
-      methodSignature: swapData.methodSignature,
-      isCampaignRelevant,
-      campaignTaskId: campaignPool?.taskId,
-    };
+    // Store swap record directly with clean primitive values
 
-    await db.insert("swap").values(swapRecord);
+    await db.insert("swap").values({
+      id: String(swapData.txHash),
+      txHash: String(swapData.txHash),
+      chainId: Number(swapData.chainId),
+      blockNumber: BigInt(String(swapData.blockNumber)),
+      blockTimestamp: BigInt(String(swapData.blockTimestamp)),
+      from: String(swapData.sender),
+      to: String(swapData.recipient),
+      tokenIn: String(swapData.poolAddress),
+      tokenOut: String(swapData.poolAddress),
+      amountIn: BigInt(String(amountIn)),
+      amountOut: BigInt(String(amountOut)),
+      router: String(swapData.router),
+      methodSignature: String(swapData.methodSignature),
+      isCampaignRelevant: Boolean(isCampaignRelevant),
+      campaignTaskId: campaignPool?.taskId ? Number(campaignPool.taskId) : null,
+    });
 
     // If campaign relevant, process task completion
     if (isCampaignRelevant && campaignPool) {
