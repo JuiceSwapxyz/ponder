@@ -1,8 +1,20 @@
 import { Request, Response } from 'express';
 import { GraphQLClient } from 'graphql-request';
+import type {
+  Task,
+  ChainTasks,
+  TaskCompletionItem,
+  TaskCompletionsResponse,
+  SwapResponse,
+  TaskCompletionResponse,
+  CampaignProgressResponse,
+  CheckSwapResponse,
+  CompleteTaskResponse,
+  ErrorResponse,
+} from '../types';
 
 // Multi-Chain Task definitions
-const CHAIN_TASKS = {
+const CHAIN_TASKS: ChainTasks = {
   // Citrea Testnet
   5115: [
     {
@@ -82,14 +94,17 @@ const CHAIN_TASKS = {
 };
 
 // Helper function to get tasks for a specific chain
-function getTasksForChain(chainId: number) {
+function getTasksForChain(chainId: number): Task[] {
   return CHAIN_TASKS[chainId as keyof typeof CHAIN_TASKS] || [];
 }
 
 // GraphQL client to query Ponder's API
 const graphqlClient = new GraphQLClient(process.env.PONDER_GRAPHQL_URL || 'http://localhost:42069/graphql');
 
-export async function getCampaignProgress(req: Request, res: Response) {
+export async function getCampaignProgress(
+  req: Request<{}, {}, { walletAddress?: string; chainId?: string }>,
+  res: Response<CampaignProgressResponse | ErrorResponse>
+): Promise<Response | void> {
   try {
     const { walletAddress, chainId } = req.body;
 
@@ -121,7 +136,7 @@ export async function getCampaignProgress(req: Request, res: Response) {
       }
     `;
 
-    const data = await graphqlClient.request(query, {
+    const data = await graphqlClient.request<TaskCompletionsResponse>(query, {
       walletAddress: walletAddress.toLowerCase(),
       chainId: parseInt(chainId)
     });
@@ -139,7 +154,7 @@ export async function getCampaignProgress(req: Request, res: Response) {
     // Build response with all tasks and their status
     const completedTasks = data.taskCompletions?.items || [];
     const tasks = chainTasks.map(task => {
-      const completed = completedTasks.find((t: any) => t.taskId === task.id);
+      const completed = completedTasks.find((t) => t.taskId === task.id);
       return {
         id: task.id,
         name: task.name,
@@ -173,7 +188,10 @@ export async function getCampaignProgress(req: Request, res: Response) {
   }
 }
 
-export async function checkSwapTransaction(req: Request, res: Response) {
+export async function checkSwapTransaction(
+  req: Request<{}, {}, { txHash?: string; walletAddress?: string; chainId?: string }>,
+  res: Response<CheckSwapResponse | ErrorResponse>
+): Promise<Response | void> {
   try {
     const { txHash, walletAddress, chainId } = req.body;
 
@@ -209,7 +227,7 @@ export async function checkSwapTransaction(req: Request, res: Response) {
       }
     `;
 
-    const swapData = await graphqlClient.request(swapQuery, {
+    const swapData = await graphqlClient.request<SwapResponse>(swapQuery, {
       txHash: txHash.toLowerCase()
     });
 
@@ -301,7 +319,7 @@ export async function checkSwapTransaction(req: Request, res: Response) {
       }
     `;
 
-    const completionData = await graphqlClient.request(completionQuery, {
+    const completionData = await graphqlClient.request<TaskCompletionResponse>(completionQuery, {
       walletAddress: walletAddress.toLowerCase(),
       chainId: parseInt(chainId),
       taskId: matchingTask.id
@@ -341,7 +359,10 @@ export async function checkSwapTransaction(req: Request, res: Response) {
   }
 }
 
-export async function completeTask(req: Request, res: Response) {
+export async function completeTask(
+  req: Request<{}, {}, { walletAddress?: string; taskId?: string; txHash?: string; chainId?: string }>,
+  res: Response<CompleteTaskResponse | ErrorResponse>
+): Promise<Response | void> {
   try {
     const { walletAddress, taskId, txHash, chainId } = req.body;
 
@@ -353,35 +374,41 @@ export async function completeTask(req: Request, res: Response) {
     }
 
     // First, verify the transaction is valid for this task
-    const checkResult = await checkSwapTransaction({
+    let checkResult: CheckSwapResponse;
+    const mockResponse = {
+      json: (data: CheckSwapResponse) => {
+        checkResult = data;
+        return data;
+      }
+    } as unknown as Response<CheckSwapResponse | ErrorResponse>;
+
+    await checkSwapTransaction({
       body: { txHash, walletAddress, chainId }
-    } as Request, {
-      json: (data: any) => data
-    } as any);
+    } as Request, mockResponse);
 
     // If the check didn't return a valid result, forward the error
-    if (!checkResult.isValid) {
+    if (!checkResult!.isValid) {
       return res.status(400).json({
         error: 'Transaction validation failed',
         code: 'INVALID_TRANSACTION',
-        details: checkResult
+        details: checkResult!
       });
     }
 
     // Check if the task ID matches
-    if (checkResult.taskId !== parseInt(taskId)) {
+    if (checkResult!.taskId !== parseInt(taskId)) {
       return res.status(400).json({
         error: 'Transaction does not match the specified task',
         code: 'WRONG_TASK',
         details: {
           expectedTaskId: parseInt(taskId),
-          actualTaskId: checkResult.taskId
+          actualTaskId: checkResult!.taskId
         }
       });
     }
 
     // Check if already completed
-    if (checkResult.alreadyCompleted) {
+    if (checkResult!.alreadyCompleted) {
       return res.status(400).json({
         error: 'Task already completed',
         code: 'TASK_ALREADY_COMPLETED',
@@ -393,11 +420,17 @@ export async function completeTask(req: Request, res: Response) {
     // when the swap transaction is processed. We just need to confirm it exists.
 
     // Get updated progress
-    const progressResult = await getCampaignProgress({
+    let progressResult: CampaignProgressResponse;
+    const mockProgressResponse = {
+      json: (data: CampaignProgressResponse) => {
+        progressResult = data;
+        return data;
+      }
+    } as unknown as Response<CampaignProgressResponse | ErrorResponse>;
+
+    await getCampaignProgress({
       body: { walletAddress, chainId }
-    } as Request, {
-      json: (data: any) => data
-    } as any);
+    } as Request, mockProgressResponse);
 
     res.json({
       success: true,
@@ -406,9 +439,9 @@ export async function completeTask(req: Request, res: Response) {
       walletAddress,
       txHash,
       updatedProgress: {
-        completedTasks: progressResult.completedTasks,
-        totalTasks: progressResult.totalTasks,
-        progress: progressResult.progress
+        completedTasks: progressResult!.completedTasks,
+        totalTasks: progressResult!.totalTasks,
+        progress: progressResult!.progress
       }
     });
   } catch (error) {

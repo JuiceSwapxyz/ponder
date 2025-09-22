@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import { getCampaignProgress, checkSwapTransaction, completeTask } from './controllers/campaignController';
 
@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'JuiceSwap Campaign API' });
 });
 
@@ -20,13 +20,15 @@ app.post('/campaign/check-swap', checkSwapTransaction);
 app.post('/campaign/complete-task', completeTask);
 
 // Error handling middleware
-app.use((error: any, req: any, res: any, next: any) => {
+const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
   console.error('API Error:', error);
   res.status(500).json({
     error: 'Internal server error',
     code: 'SERVER_ERROR'
   });
-});
+};
+
+app.use(errorHandler);
 
 // Start server
 if (process.env.NODE_ENV !== 'test') {

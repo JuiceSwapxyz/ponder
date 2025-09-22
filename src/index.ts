@@ -1,8 +1,16 @@
+// @ts-ignore - Generated at build time
 import { ponder } from "@/generated";
-import { getAddress, isAddressEqual } from "viem";
+import { getAddress, isAddressEqual, Address, Hash } from "viem";
+import type {
+  TransactionEvent,
+  TransactionReceipt,
+  PonderContext,
+  SwapAnalysisResult,
+  CampaignToken,
+} from "./types";
 
 // Multi-Chain Campaign Token Mapping
-const CAMPAIGN_TOKENS = {
+const CAMPAIGN_TOKENS: Record<number, Record<string, CampaignToken>> = {
   // Citrea Testnet
   5115: {
     "0x9B28B690550522608890C3C7e63c0b4A7eBab9AA": { taskId: 1, symbol: "NUSD" },
@@ -30,7 +38,7 @@ const CAMPAIGN_TOKENS = {
 };
 
 // Multi-Chain Router addresses for validation
-const KNOWN_ROUTERS = {
+const KNOWN_ROUTERS: Record<number, string[]> = {
   // Citrea Testnet
   5115: [
     "0x610c98EAD0df13EA906854b6041122e8A8D14413", // JuiceSwap Router02
@@ -112,7 +120,7 @@ const KNOWN_ROUTERS = {
 // });
 
 // Initialize campaign tokens
-ponder.on("NUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
+ponder.on("NUSD_CitreaTestnet:Transfer" as any, async ({ event, context }: any) => {
   await initializeToken(
     "0x9B28B690550522608890C3C7e63c0b4A7eBab9AA",
     5115,
@@ -121,7 +129,7 @@ ponder.on("NUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
   );
 });
 
-ponder.on("cUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
+ponder.on("cUSD_CitreaTestnet:Transfer" as any, async ({ event, context }: any) => {
   await initializeToken(
     "0x2fFC18aC99D367b70dd922771dF8c2074af4aCE0",
     5115,
@@ -130,7 +138,7 @@ ponder.on("cUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
   );
 });
 
-ponder.on("USDC_CitreaTestnet:Transfer", async ({ event, context }) => {
+ponder.on("USDC_CitreaTestnet:Transfer" as any, async ({ event, context }: any) => {
   await initializeToken(
     "0x36c16eaC6B0Ba6c50f494914ff015fCa95B7835F",
     5115,
@@ -193,11 +201,16 @@ ponder.on("USDC_CitreaTestnet:Transfer", async ({ event, context }) => {
 // });
 
 // Helper Functions
-async function analyzeSwapTransaction(receipt: any, event: any, context: any, chainId: number) {
+async function analyzeSwapTransaction(
+  receipt: TransactionReceipt,
+  event: TransactionEvent,
+  context: PonderContext,
+  chainId: number
+): Promise<SwapAnalysisResult | null> {
   const { block } = context;
 
   // Look for Transfer events in the transaction
-  const transferEvents = receipt.logs.filter((log: any) =>
+  const transferEvents = receipt.logs.filter((log) =>
     log.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" // Transfer event signature
   );
 
@@ -245,7 +258,7 @@ async function analyzeSwapTransaction(receipt: any, event: any, context: any, ch
     blockTimestamp: BigInt(block.timestamp),
     from: getAddress(from),
     to: getAddress(event.transaction.to || "0x0"),
-    tokenIn: tokenIn || "0x0000000000000000000000000000000000000000",
+    tokenIn: tokenIn ? getAddress(tokenIn) : ("0x0000000000000000000000000000000000000000" as Address),
     tokenOut: getAddress(tokenOut),
     amountIn,
     amountOut,
@@ -254,12 +267,13 @@ async function analyzeSwapTransaction(receipt: any, event: any, context: any, ch
   };
 }
 
-async function processSwap(swapData: any, context: any) {
+async function processSwap(swapData: SwapAnalysisResult, context: PonderContext): Promise<void> {
   const { db } = context;
 
   // Check if this is a campaign-relevant swap
   const campaignToken = CAMPAIGN_TOKENS[swapData.chainId]?.[swapData.tokenOut.toLowerCase()];
-  const isCampaignRelevant = !!campaignToken && swapData.tokenIn === "0x0000000000000000000000000000000000000000";
+  const nativeToken = "0x0000000000000000000000000000000000000000" as Address;
+  const isCampaignRelevant = !!campaignToken && swapData.tokenIn === nativeToken;
 
   // Store swap record
   await db.swap.create({
@@ -291,7 +305,11 @@ async function processSwap(swapData: any, context: any) {
   await updateCampaignStats(swapData.chainId, context);
 }
 
-async function processTaskCompletion(swapData: any, taskId: number, context: any) {
+async function processTaskCompletion(
+  swapData: SwapAnalysisResult,
+  taskId: number,
+  context: PonderContext
+): Promise<void> {
   const { db } = context;
 
   const progressId = `${swapData.chainId}:${swapData.from.toLowerCase()}`;
@@ -329,7 +347,7 @@ async function processTaskCompletion(swapData: any, taskId: number, context: any
   });
 }
 
-async function updateCampaignStats(chainId: number, context: any) {
+async function updateCampaignStats(chainId: number, context: PonderContext): Promise<void> {
   const { db } = context;
 
   // Get current stats counts
@@ -388,8 +406,8 @@ async function initializeToken(
   address: string,
   chainId: number,
   metadata: { symbol: string; name: string; decimals: number; taskId?: number },
-  context: any
-) {
+  context: PonderContext
+): Promise<void> {
   const { db } = context;
 
   const tokenId = `${chainId}:${address.toLowerCase()}`;
