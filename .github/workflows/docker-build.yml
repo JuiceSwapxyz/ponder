@@ -1,0 +1,42 @@
+name: Docker Build & Test
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'package*.json'
+      - 'src/**'
+      - 'abis/**'
+      - 'ponder.config.ts'
+      - 'ponder.schema.ts'
+
+jobs:
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: juiceswap-ponder:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker Compose
+        run: |
+          cp .env.example .env
+          docker compose build
+          docker compose up -d
+          sleep 10
+          docker compose ps
+          docker compose logs
+          docker compose down
