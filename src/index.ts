@@ -65,22 +65,22 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
 
     processedTxns.add(event.transaction.hash);
 
-    // Create swap data from the Swap event
+    // Create swap data from the Swap event - extract plain values from Ponder proxy objects
     const swapData = {
-      txHash: event.transaction.hash,
-      chainId: 5115,
+      txHash: String(event.transaction.hash),
+      chainId: Number(5115),
       blockNumber: BigInt(event.block.number),
       blockTimestamp: BigInt(event.block.timestamp),
-      poolAddress: getAddress(event.log.address),
-      sender: getAddress(event.args.sender),
-      recipient: getAddress(event.args.recipient),
-      amount0: event.args.amount0,
-      amount1: event.args.amount1,
-      sqrtPriceX96: event.args.sqrtPriceX96,
-      liquidity: event.args.liquidity,
-      tick: event.args.tick,
-      router: event.transaction.to ? getAddress(event.transaction.to) : getAddress(event.args.sender),
-      methodSignature: event.transaction.input.slice(0, 10),
+      poolAddress: getAddress(String(event.log.address)),
+      sender: getAddress(String(event.args.sender)),
+      recipient: getAddress(String(event.args.recipient)),
+      amount0: BigInt(String(event.args.amount0)),
+      amount1: BigInt(String(event.args.amount1)),
+      sqrtPriceX96: BigInt(String(event.args.sqrtPriceX96)),
+      liquidity: BigInt(String(event.args.liquidity)),
+      tick: Number(String(event.args.tick)),
+      router: event.transaction.to ? getAddress(String(event.transaction.to)) : getAddress(String(event.args.sender)),
+      methodSignature: String(event.transaction.input).slice(0, 10),
     };
 
     // Get campaign pool info
@@ -91,8 +91,8 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
     const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
     const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
 
-    // Store swap record
-    await db.insert("swap").values({
+    // Store swap record - create clean data object
+    const swapRecord = {
       id: swapData.txHash,
       txHash: swapData.txHash,
       chainId: swapData.chainId,
@@ -108,7 +108,9 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       methodSignature: swapData.methodSignature,
       isCampaignRelevant,
       campaignTaskId: campaignPool?.taskId,
-    });
+    };
+
+    await db.insert("swap").values(swapRecord);
 
     // If campaign relevant, process task completion
     if (isCampaignRelevant && campaignPool) {
@@ -116,13 +118,15 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       const completionId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}:${1}`;
 
       // Ensure campaign progress exists
-      await db.insert("campaignProgress").values({
+      const progressData = {
         id: progressId,
         walletAddress: swapData.recipient,
         chainId: swapData.chainId,
         createdAt: swapData.blockTimestamp,
         updatedAt: swapData.blockTimestamp,
-      }).onConflictDoUpdate({
+      };
+
+      await db.insert("campaignProgress").values(progressData).onConflictDoUpdate({
         target: "id",
         set: {
           updatedAt: swapData.blockTimestamp,
@@ -130,7 +134,7 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       });
 
       // Record task completion
-      await db.insert("taskCompletion").values({
+      const completionData = {
         id: completionId,
         walletAddress: swapData.recipient,
         chainId: swapData.chainId,
@@ -141,7 +145,9 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
         inputToken: swapData.poolAddress,
         outputToken: swapData.poolAddress,
         blockNumber: swapData.blockNumber,
-      }).onConflictDoNothing();
+      };
+
+      await db.insert("taskCompletion").values(completionData).onConflictDoNothing();
     }
 
     // Update campaign stats
@@ -159,7 +165,7 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
     const task3Completions = Number(task3Result.count);
     const totalVolume = swapsResult.reduce((sum: bigint, row: any) => sum + BigInt(row.amountOut), BigInt(0));
 
-    await db.insert("campaignStats").values({
+    const statsData = {
       id: swapData.chainId.toString(),
       chainId: swapData.chainId,
       totalUsers,
@@ -169,7 +175,9 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       task2Completions,
       task3Completions,
       lastUpdated: BigInt(Date.now()),
-    }).onConflictDoUpdate({
+    };
+
+    await db.insert("campaignStats").values(statsData).onConflictDoUpdate({
       target: "id",
       set: {
         totalUsers,
@@ -204,22 +212,22 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
 
     processedTxns.add(event.transaction.hash);
 
-    // Create swap data from the Swap event
+    // Create swap data from the Swap event - extract plain values from Ponder proxy objects
     const swapData = {
-      txHash: event.transaction.hash,
-      chainId: 5115,
+      txHash: String(event.transaction.hash),
+      chainId: Number(5115),
       blockNumber: BigInt(event.block.number),
       blockTimestamp: BigInt(event.block.timestamp),
-      poolAddress: getAddress(event.log.address),
-      sender: getAddress(event.args.sender),
-      recipient: getAddress(event.args.recipient),
-      amount0: event.args.amount0,
-      amount1: event.args.amount1,
-      sqrtPriceX96: event.args.sqrtPriceX96,
-      liquidity: event.args.liquidity,
-      tick: event.args.tick,
-      router: event.transaction.to ? getAddress(event.transaction.to) : getAddress(event.args.sender),
-      methodSignature: event.transaction.input.slice(0, 10),
+      poolAddress: getAddress(String(event.log.address)),
+      sender: getAddress(String(event.args.sender)),
+      recipient: getAddress(String(event.args.recipient)),
+      amount0: BigInt(String(event.args.amount0)),
+      amount1: BigInt(String(event.args.amount1)),
+      sqrtPriceX96: BigInt(String(event.args.sqrtPriceX96)),
+      liquidity: BigInt(String(event.args.liquidity)),
+      tick: Number(String(event.args.tick)),
+      router: event.transaction.to ? getAddress(String(event.transaction.to)) : getAddress(String(event.args.sender)),
+      methodSignature: String(event.transaction.input).slice(0, 10),
     };
 
     // Get campaign pool info
@@ -230,8 +238,8 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
     const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
     const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
 
-    // Store swap record
-    await db.insert("swap").values({
+    // Store swap record - create clean data object
+    const swapRecord = {
       id: swapData.txHash,
       txHash: swapData.txHash,
       chainId: swapData.chainId,
@@ -247,7 +255,9 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       methodSignature: swapData.methodSignature,
       isCampaignRelevant,
       campaignTaskId: campaignPool?.taskId,
-    });
+    };
+
+    await db.insert("swap").values(swapRecord);
 
     // If campaign relevant, process task completion
     if (isCampaignRelevant && campaignPool) {
@@ -255,13 +265,15 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       const completionId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}:${2}`;
 
       // Ensure campaign progress exists
-      await db.insert("campaignProgress").values({
+      const progressData = {
         id: progressId,
         walletAddress: swapData.recipient,
         chainId: swapData.chainId,
         createdAt: swapData.blockTimestamp,
         updatedAt: swapData.blockTimestamp,
-      }).onConflictDoUpdate({
+      };
+
+      await db.insert("campaignProgress").values(progressData).onConflictDoUpdate({
         target: "id",
         set: {
           updatedAt: swapData.blockTimestamp,
@@ -269,7 +281,7 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       });
 
       // Record task completion
-      await db.insert("taskCompletion").values({
+      const completionData = {
         id: completionId,
         walletAddress: swapData.recipient,
         chainId: swapData.chainId,
@@ -280,7 +292,9 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
         inputToken: swapData.poolAddress,
         outputToken: swapData.poolAddress,
         blockNumber: swapData.blockNumber,
-      }).onConflictDoNothing();
+      };
+
+      await db.insert("taskCompletion").values(completionData).onConflictDoNothing();
     }
 
     // Update campaign stats
@@ -298,7 +312,7 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
     const task3Completions = Number(task3Result.count);
     const totalVolume = swapsResult.reduce((sum: bigint, row: any) => sum + BigInt(row.amountOut), BigInt(0));
 
-    await db.insert("campaignStats").values({
+    const statsData = {
       id: swapData.chainId.toString(),
       chainId: swapData.chainId,
       totalUsers,
@@ -308,7 +322,9 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
       task2Completions,
       task3Completions,
       lastUpdated: BigInt(Date.now()),
-    }).onConflictDoUpdate({
+    };
+
+    await db.insert("campaignStats").values(statsData).onConflictDoUpdate({
       target: "id",
       set: {
         totalUsers,
@@ -343,22 +359,22 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
 
     processedTxns.add(event.transaction.hash);
 
-    // Create swap data from the Swap event
+    // Create swap data from the Swap event - extract plain values from Ponder proxy objects
     const swapData = {
-      txHash: event.transaction.hash,
-      chainId: 5115,
+      txHash: String(event.transaction.hash),
+      chainId: Number(5115),
       blockNumber: BigInt(event.block.number),
       blockTimestamp: BigInt(event.block.timestamp),
-      poolAddress: getAddress(event.log.address),
-      sender: getAddress(event.args.sender),
-      recipient: getAddress(event.args.recipient),
-      amount0: event.args.amount0,
-      amount1: event.args.amount1,
-      sqrtPriceX96: event.args.sqrtPriceX96,
-      liquidity: event.args.liquidity,
-      tick: event.args.tick,
-      router: event.transaction.to ? getAddress(event.transaction.to) : getAddress(event.args.sender),
-      methodSignature: event.transaction.input.slice(0, 10),
+      poolAddress: getAddress(String(event.log.address)),
+      sender: getAddress(String(event.args.sender)),
+      recipient: getAddress(String(event.args.recipient)),
+      amount0: BigInt(String(event.args.amount0)),
+      amount1: BigInt(String(event.args.amount1)),
+      sqrtPriceX96: BigInt(String(event.args.sqrtPriceX96)),
+      liquidity: BigInt(String(event.args.liquidity)),
+      tick: Number(String(event.args.tick)),
+      router: event.transaction.to ? getAddress(String(event.transaction.to)) : getAddress(String(event.args.sender)),
+      methodSignature: String(event.transaction.input).slice(0, 10),
     };
 
     // Get campaign pool info
@@ -369,8 +385,8 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
     const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
     const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
 
-    // Store swap record
-    await db.insert("swap").values({
+    // Store swap record - create clean data object
+    const swapRecord = {
       id: swapData.txHash,
       txHash: swapData.txHash,
       chainId: swapData.chainId,
@@ -386,7 +402,9 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
       methodSignature: swapData.methodSignature,
       isCampaignRelevant,
       campaignTaskId: campaignPool?.taskId,
-    });
+    };
+
+    await db.insert("swap").values(swapRecord);
 
     // If campaign relevant, process task completion
     if (isCampaignRelevant && campaignPool) {
@@ -394,13 +412,15 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
       const completionId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}:${3}`;
 
       // Ensure campaign progress exists
-      await db.insert("campaignProgress").values({
+      const progressData = {
         id: progressId,
         walletAddress: swapData.recipient,
         chainId: swapData.chainId,
         createdAt: swapData.blockTimestamp,
         updatedAt: swapData.blockTimestamp,
-      }).onConflictDoUpdate({
+      };
+
+      await db.insert("campaignProgress").values(progressData).onConflictDoUpdate({
         target: "id",
         set: {
           updatedAt: swapData.blockTimestamp,
@@ -408,7 +428,7 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
       });
 
       // Record task completion
-      await db.insert("taskCompletion").values({
+      const completionData = {
         id: completionId,
         walletAddress: swapData.recipient,
         chainId: swapData.chainId,
@@ -419,7 +439,9 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
         inputToken: swapData.poolAddress,
         outputToken: swapData.poolAddress,
         blockNumber: swapData.blockNumber,
-      }).onConflictDoNothing();
+      };
+
+      await db.insert("taskCompletion").values(completionData).onConflictDoNothing();
     }
 
     // Update campaign stats
@@ -437,7 +459,7 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
     const task3Completions = Number(task3Result.count);
     const totalVolume = swapsResult.reduce((sum: bigint, row: any) => sum + BigInt(row.amountOut), BigInt(0));
 
-    await db.insert("campaignStats").values({
+    const statsData = {
       id: swapData.chainId.toString(),
       chainId: swapData.chainId,
       totalUsers,
@@ -447,7 +469,9 @@ ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
       task2Completions,
       task3Completions,
       lastUpdated: BigInt(Date.now()),
-    }).onConflictDoUpdate({
+    };
+
+    await db.insert("campaignStats").values(statsData).onConflictDoUpdate({
       target: "id",
       set: {
         totalUsers,
