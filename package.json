@@ -8,7 +8,7 @@
     "dev": "ponder dev",
     "start": "ponder start",
     "codegen": "ponder codegen",
-    "build": "ponder build",
+    "build": "ponder codegen",
     "api": "tsx src/api/index.ts",
     "api:dev": "tsx watch src/api/index.ts",
     "test": "echo \"Warning: no test specified\" && exit 0"
