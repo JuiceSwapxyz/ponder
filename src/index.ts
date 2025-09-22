@@ -12,200 +12,455 @@ import type {
 // Track processed transactions to avoid duplicates
 const processedTxns = new Set<string>();
 
-// Multi-Chain Campaign Token Mapping
-const CAMPAIGN_TOKENS: Record<number, Record<string, CampaignToken>> = {
-  // Citrea Testnet
+// Multi-Chain Campaign Pool Mapping - Maps pool addresses to campaign tasks
+const CAMPAIGN_POOLS: Record<number, Record<string, CampaignToken>> = {
+  // Citrea Testnet - UniswapV3 Pools for Citrea bApps Campaign
   5115: {
-    "0x9B28B690550522608890C3C7e63c0b4A7eBab9AA": { taskId: 1, symbol: "NUSD" },
-    "0x2fFC18aC99D367b70dd922771dF8c2074af4aCE0": { taskId: 2, symbol: "cUSD" },
-    "0x36c16eaC6B0Ba6c50f494914ff015fCa95B7835F": { taskId: 3, symbol: "USDC" },
+    "0x6006797369E2A595D31Df4ab3691044038AAa7FE": { taskId: 1, symbol: "CBTC/NUSD" },
+    "0xA69De906B9A830Deb64edB97B2eb0848139306d2": { taskId: 2, symbol: "CBTC/cUSD" },
+    "0xD8C7604176475eB8D350bC1EE452dA4442637C09": { taskId: 3, symbol: "CBTC/USDC" },
   },
-  // Citrea Mainnet (TODO: Add actual mainnet addresses)
+  // Citrea Mainnet (TODO: Add actual mainnet pool addresses)
   62298: {
-    // "0x...": { taskId: 1, symbol: "NUSD" },
-    // "0x...": { taskId: 2, symbol: "cUSD" },
-    // "0x...": { taskId: 3, symbol: "USDC" },
+    // "0x...": { taskId: 1, symbol: "CBTC/NUSD" },
+    // "0x...": { taskId: 2, symbol: "CBTC/cUSD" },
+    // "0x...": { taskId: 3, symbol: "CBTC/USDC" },
   },
-  // Ethereum Mainnet
+  // Ethereum Mainnet (TODO: Add actual mainnet pool addresses)
   1: {
-    "0xA0b86a33E6417C00A2C62cc0ebe71a7C30c7e54D": { taskId: 1, symbol: "USDT" },
-    "0xdAC17F958D2ee523a2206206994597C13D831ec7": { taskId: 2, symbol: "USDT" },
-    "0xA0b1C33E6417C00A5C62c1c0ebe71a7C30c7e54D": { taskId: 3, symbol: "USDC" },
+    // "0x...": { taskId: 1, symbol: "ETH/USDT" },
+    // "0x...": { taskId: 2, symbol: "ETH/USDC" },
+    // "0x...": { taskId: 3, symbol: "ETH/DAI" },
   },
-  // Sepolia Testnet
+  // Sepolia Testnet (TODO: Add actual testnet pool addresses)
   11155111: {
-    "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9": { taskId: 1, symbol: "WETH" },
-    "0xf531B8F309Be94191af87605CfBf600D71C2cFe0": { taskId: 2, symbol: "USDC" },
-    "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8": { taskId: 3, symbol: "USDT" },
+    // "0x...": { taskId: 1, symbol: "WETH/USDT" },
+    // "0x...": { taskId: 2, symbol: "WETH/USDC" },
+    // "0x...": { taskId: 3, symbol: "WETH/DAI" },
   }
 };
 
-// Multi-Chain Router addresses for validation
-const KNOWN_ROUTERS: Record<number, string[]> = {
-  // Citrea Testnet
-  5115: [
-    "0x610c98EAD0df13EA906854b6041122e8A8D14413", // JuiceSwap Router02
-    "0xb2A4E33e9A9aC7c46045A2D0318a4F50194dafDE", // JuiceSwap Router
-    "0x3012E9049d05B4B5369D690114D5A5861EbB85cb", // JuiceSwap Router Alt
-  ],
-  // Citrea Mainnet (TODO: Add actual mainnet router addresses)
-  62298: [
-    // "0x...", // JuiceSwap Router02 Mainnet
-    // "0x...", // JuiceSwap Router Mainnet
-  ],
-  // Ethereum Mainnet
-  1: [
-    "0xE592427A0AEce92De3Edee1F18E0157C05861564", // Uniswap V3 Router
-    "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", // Uniswap V3 Router 2
-    "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", // Uniswap V2 Router
-  ],
-  // Sepolia Testnet
-  11155111: [
-    "0xE592427A0AEce92De3Edee1F18E0157C05861564", // Uniswap V3 Router Sepolia
-    "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", // Uniswap V3 Router 2 Sepolia
-  ]
-};
+// Expected Swap event signature: 0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67
+const SWAP_EVENT_SIGNATURE = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67";
 
-// Track swap transactions from router calls
-// For now, we don't have specific events from the routers
-// We'll rely on Transfer events from the tokens to track swaps
+// ========================================
+// CITREA TESTNET - UNISWAP V3 POOL SWAP EVENT HANDLERS
+// ========================================
 
-// Token Transfer event handlers with swap detection logic
-// Since routers don't emit events, we detect swaps from token transfers
-
-// Token Transfer event handlers - Detect and process swaps
-ponder.on("NUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
-  const { db, block } = context;
-
-  // Check if this transaction involves a known router
-  const txTo = event.transaction.to ? getAddress(event.transaction.to) : null;
-  const isRouterTx = txTo && KNOWN_ROUTERS[5115]?.some(router => isAddressEqual(txTo, router));
+// CBTC/NUSD Pool Swap Handler (Task 1)
+ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
+  const { db } = context;
 
   // Skip if we've already processed this transaction
   if (processedTxns.has(event.transaction.hash)) {
     return;
   }
 
-  // Process if this is a router transaction or if value was sent (native token swap)
-  if (isRouterTx || event.transaction.value > 0n) {
-    processedTxns.add(event.transaction.hash);
-    try {
-      // Create simplified swap data from the Transfer event
-      const swapData = {
-        txHash: event.transaction.hash,
-        chainId: 5115,
-        blockNumber: BigInt(block.number),
-        blockTimestamp: BigInt(block.timestamp),
-        from: getAddress(event.transaction.from),
-        to: txTo || ("0x0000000000000000000000000000000000000000" as Address),
-        tokenIn: event.transaction.value > 0n ? ("0x0000000000000000000000000000000000000000" as Address) : getAddress(event.args.from),
-        tokenOut: getAddress(event.log.address),
-        amountIn: event.transaction.value > 0n ? event.transaction.value : 0n,
-        amountOut: BigInt(event.args.value),
-        router: txTo || ("0x0000000000000000000000000000000000000000" as Address),
-        methodSignature: event.transaction.input.slice(0, 10),
-      };
-
-      // Check if this is a swap to NUSD from native token
-      const isCampaignRelevant = event.transaction.value > 0n &&
-        CAMPAIGN_TOKENS[5115]?.[event.log.address.toLowerCase()];
-
-      if (isCampaignRelevant) {
-        await processSwap(swapData, context);
-      }
-    } catch (error) {
-      console.error("Error processing NUSD transfer:", error);
+  try {
+    // Validate required event properties
+    if (!event.block || !event.transaction || !event.log || !event.args) {
+      console.error("Missing required event properties for CBTC/NUSD pool swap");
+      return;
     }
+
+    processedTxns.add(event.transaction.hash);
+
+    // Create swap data from the Swap event
+    const swapData = {
+      txHash: event.transaction.hash,
+      chainId: 5115,
+      blockNumber: BigInt(event.block.number),
+      blockTimestamp: BigInt(event.block.timestamp),
+      poolAddress: getAddress(event.log.address),
+      sender: getAddress(event.args.sender),
+      recipient: getAddress(event.args.recipient),
+      amount0: event.args.amount0,
+      amount1: event.args.amount1,
+      sqrtPriceX96: event.args.sqrtPriceX96,
+      liquidity: event.args.liquidity,
+      tick: event.args.tick,
+      router: event.transaction.to ? getAddress(event.transaction.to) : getAddress(event.args.sender),
+      methodSignature: event.transaction.input.slice(0, 10),
+    };
+
+    // Get campaign pool info
+    const campaignPool = CAMPAIGN_POOLS[swapData.chainId]?.[swapData.poolAddress.toLowerCase()];
+    const isCampaignRelevant = !!campaignPool && campaignPool.taskId === 1;
+
+    // Determine amounts for storage (use absolute values)
+    const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
+    const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
+
+    // Store swap record
+    await db.insert("swap").values({
+      id: swapData.txHash,
+      txHash: swapData.txHash,
+      chainId: swapData.chainId,
+      blockNumber: swapData.blockNumber,
+      blockTimestamp: swapData.blockTimestamp,
+      from: swapData.sender,
+      to: swapData.recipient,
+      tokenIn: swapData.poolAddress,
+      tokenOut: swapData.poolAddress,
+      amountIn,
+      amountOut,
+      router: swapData.router,
+      methodSignature: swapData.methodSignature,
+      isCampaignRelevant,
+      campaignTaskId: campaignPool?.taskId,
+    });
+
+    // If campaign relevant, process task completion
+    if (isCampaignRelevant && campaignPool) {
+      const progressId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}`;
+      const completionId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}:${1}`;
+
+      // Ensure campaign progress exists
+      await db.insert("campaignProgress").values({
+        id: progressId,
+        walletAddress: swapData.recipient,
+        chainId: swapData.chainId,
+        createdAt: swapData.blockTimestamp,
+        updatedAt: swapData.blockTimestamp,
+      }).onConflictDoUpdate({
+        target: "id",
+        set: {
+          updatedAt: swapData.blockTimestamp,
+        },
+      });
+
+      // Record task completion
+      await db.insert("taskCompletion").values({
+        id: completionId,
+        walletAddress: swapData.recipient,
+        chainId: swapData.chainId,
+        taskId: 1,
+        txHash: swapData.txHash,
+        completedAt: swapData.blockTimestamp,
+        swapAmount: amountOut,
+        inputToken: swapData.poolAddress,
+        outputToken: swapData.poolAddress,
+        blockNumber: swapData.blockNumber,
+      }).onConflictDoNothing();
+    }
+
+    // Update campaign stats
+    const [totalUsersResult] = await db.sql`SELECT COUNT(*) as count FROM "campaignProgress" WHERE "chainId" = ${swapData.chainId}`;
+    const [totalSwapsResult] = await db.sql`SELECT COUNT(*) as count FROM "swap" WHERE "chainId" = ${swapData.chainId} AND "isCampaignRelevant" = true`;
+    const [task1Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 1`;
+    const [task2Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 2`;
+    const [task3Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 3`;
+    const swapsResult = await db.sql`SELECT "amountOut" FROM "swap" WHERE "chainId" = ${swapData.chainId} AND "isCampaignRelevant" = true`;
+
+    const totalUsers = Number(totalUsersResult.count);
+    const totalSwaps = Number(totalSwapsResult.count);
+    const task1Completions = Number(task1Result.count);
+    const task2Completions = Number(task2Result.count);
+    const task3Completions = Number(task3Result.count);
+    const totalVolume = swapsResult.reduce((sum: bigint, row: any) => sum + BigInt(row.amountOut), BigInt(0));
+
+    await db.insert("campaignStats").values({
+      id: swapData.chainId.toString(),
+      chainId: swapData.chainId,
+      totalUsers,
+      totalSwaps,
+      totalVolume,
+      task1Completions,
+      task2Completions,
+      task3Completions,
+      lastUpdated: BigInt(Date.now()),
+    }).onConflictDoUpdate({
+      target: "id",
+      set: {
+        totalUsers,
+        totalSwaps,
+        totalVolume,
+        task1Completions,
+        task2Completions,
+        task3Completions,
+        lastUpdated: BigInt(Date.now()),
+      },
+    });
+  } catch (error) {
+    console.error("Error processing CBTC/NUSD pool swap:", error);
   }
 });
 
-ponder.on("cUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
-  const { db, block } = context;
-
-  // Check if this transaction involves a known router
-  const txTo = event.transaction.to ? getAddress(event.transaction.to) : null;
-  const isRouterTx = txTo && KNOWN_ROUTERS[5115]?.some(router => isAddressEqual(txTo, router));
+// CBTC/cUSD Pool Swap Handler (Task 2)
+ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
+  const { db } = context;
 
   // Skip if we've already processed this transaction
   if (processedTxns.has(event.transaction.hash)) {
     return;
   }
 
-  // Process if this is a router transaction or if value was sent (native token swap)
-  if (isRouterTx || event.transaction.value > 0n) {
-    processedTxns.add(event.transaction.hash);
-    try {
-      // Create simplified swap data from the Transfer event
-      const swapData = {
-        txHash: event.transaction.hash,
-        chainId: 5115,
-        blockNumber: BigInt(block.number),
-        blockTimestamp: BigInt(block.timestamp),
-        from: getAddress(event.transaction.from),
-        to: txTo || ("0x0000000000000000000000000000000000000000" as Address),
-        tokenIn: event.transaction.value > 0n ? ("0x0000000000000000000000000000000000000000" as Address) : getAddress(event.args.from),
-        tokenOut: getAddress(event.log.address),
-        amountIn: event.transaction.value > 0n ? event.transaction.value : 0n,
-        amountOut: BigInt(event.args.value),
-        router: txTo || ("0x0000000000000000000000000000000000000000" as Address),
-        methodSignature: event.transaction.input.slice(0, 10),
-      };
-
-      // Check if this is a swap to cUSD from native token
-      const isCampaignRelevant = event.transaction.value > 0n &&
-        CAMPAIGN_TOKENS[5115]?.[event.log.address.toLowerCase()];
-
-      if (isCampaignRelevant) {
-        await processSwap(swapData, context);
-      }
-    } catch (error) {
-      console.error("Error processing cUSD transfer:", error);
+  try {
+    // Validate required event properties
+    if (!event.block || !event.transaction || !event.log || !event.args) {
+      console.error("Missing required event properties for CBTC/cUSD pool swap");
+      return;
     }
+
+    processedTxns.add(event.transaction.hash);
+
+    // Create swap data from the Swap event
+    const swapData = {
+      txHash: event.transaction.hash,
+      chainId: 5115,
+      blockNumber: BigInt(event.block.number),
+      blockTimestamp: BigInt(event.block.timestamp),
+      poolAddress: getAddress(event.log.address),
+      sender: getAddress(event.args.sender),
+      recipient: getAddress(event.args.recipient),
+      amount0: event.args.amount0,
+      amount1: event.args.amount1,
+      sqrtPriceX96: event.args.sqrtPriceX96,
+      liquidity: event.args.liquidity,
+      tick: event.args.tick,
+      router: event.transaction.to ? getAddress(event.transaction.to) : getAddress(event.args.sender),
+      methodSignature: event.transaction.input.slice(0, 10),
+    };
+
+    // Get campaign pool info
+    const campaignPool = CAMPAIGN_POOLS[swapData.chainId]?.[swapData.poolAddress.toLowerCase()];
+    const isCampaignRelevant = !!campaignPool && campaignPool.taskId === 2;
+
+    // Determine amounts for storage (use absolute values)
+    const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
+    const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
+
+    // Store swap record
+    await db.insert("swap").values({
+      id: swapData.txHash,
+      txHash: swapData.txHash,
+      chainId: swapData.chainId,
+      blockNumber: swapData.blockNumber,
+      blockTimestamp: swapData.blockTimestamp,
+      from: swapData.sender,
+      to: swapData.recipient,
+      tokenIn: swapData.poolAddress,
+      tokenOut: swapData.poolAddress,
+      amountIn,
+      amountOut,
+      router: swapData.router,
+      methodSignature: swapData.methodSignature,
+      isCampaignRelevant,
+      campaignTaskId: campaignPool?.taskId,
+    });
+
+    // If campaign relevant, process task completion
+    if (isCampaignRelevant && campaignPool) {
+      const progressId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}`;
+      const completionId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}:${2}`;
+
+      // Ensure campaign progress exists
+      await db.insert("campaignProgress").values({
+        id: progressId,
+        walletAddress: swapData.recipient,
+        chainId: swapData.chainId,
+        createdAt: swapData.blockTimestamp,
+        updatedAt: swapData.blockTimestamp,
+      }).onConflictDoUpdate({
+        target: "id",
+        set: {
+          updatedAt: swapData.blockTimestamp,
+        },
+      });
+
+      // Record task completion
+      await db.insert("taskCompletion").values({
+        id: completionId,
+        walletAddress: swapData.recipient,
+        chainId: swapData.chainId,
+        taskId: 2,
+        txHash: swapData.txHash,
+        completedAt: swapData.blockTimestamp,
+        swapAmount: amountOut,
+        inputToken: swapData.poolAddress,
+        outputToken: swapData.poolAddress,
+        blockNumber: swapData.blockNumber,
+      }).onConflictDoNothing();
+    }
+
+    // Update campaign stats
+    const [totalUsersResult] = await db.sql`SELECT COUNT(*) as count FROM "campaignProgress" WHERE "chainId" = ${swapData.chainId}`;
+    const [totalSwapsResult] = await db.sql`SELECT COUNT(*) as count FROM "swap" WHERE "chainId" = ${swapData.chainId} AND "isCampaignRelevant" = true`;
+    const [task1Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 1`;
+    const [task2Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 2`;
+    const [task3Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 3`;
+    const swapsResult = await db.sql`SELECT "amountOut" FROM "swap" WHERE "chainId" = ${swapData.chainId} AND "isCampaignRelevant" = true`;
+
+    const totalUsers = Number(totalUsersResult.count);
+    const totalSwaps = Number(totalSwapsResult.count);
+    const task1Completions = Number(task1Result.count);
+    const task2Completions = Number(task2Result.count);
+    const task3Completions = Number(task3Result.count);
+    const totalVolume = swapsResult.reduce((sum: bigint, row: any) => sum + BigInt(row.amountOut), BigInt(0));
+
+    await db.insert("campaignStats").values({
+      id: swapData.chainId.toString(),
+      chainId: swapData.chainId,
+      totalUsers,
+      totalSwaps,
+      totalVolume,
+      task1Completions,
+      task2Completions,
+      task3Completions,
+      lastUpdated: BigInt(Date.now()),
+    }).onConflictDoUpdate({
+      target: "id",
+      set: {
+        totalUsers,
+        totalSwaps,
+        totalVolume,
+        task1Completions,
+        task2Completions,
+        task3Completions,
+        lastUpdated: BigInt(Date.now()),
+      },
+    });
+  } catch (error) {
+    console.error("Error processing CBTC/cUSD pool swap:", error);
   }
 });
 
-ponder.on("USDC_CitreaTestnet:Transfer", async ({ event, context }) => {
-  const { db, block } = context;
-
-  // Check if this transaction involves a known router
-  const txTo = event.transaction.to ? getAddress(event.transaction.to) : null;
-  const isRouterTx = txTo && KNOWN_ROUTERS[5115]?.some(router => isAddressEqual(txTo, router));
+// CBTC/USDC Pool Swap Handler (Task 3)
+ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
+  const { db } = context;
 
   // Skip if we've already processed this transaction
   if (processedTxns.has(event.transaction.hash)) {
     return;
   }
 
-  // Process if this is a router transaction or if value was sent (native token swap)
-  if (isRouterTx || event.transaction.value > 0n) {
-    processedTxns.add(event.transaction.hash);
-    try {
-      // Create simplified swap data from the Transfer event
-      const swapData = {
-        txHash: event.transaction.hash,
-        chainId: 5115,
-        blockNumber: BigInt(block.number),
-        blockTimestamp: BigInt(block.timestamp),
-        from: getAddress(event.transaction.from),
-        to: txTo || ("0x0000000000000000000000000000000000000000" as Address),
-        tokenIn: event.transaction.value > 0n ? ("0x0000000000000000000000000000000000000000" as Address) : getAddress(event.args.from),
-        tokenOut: getAddress(event.log.address),
-        amountIn: event.transaction.value > 0n ? event.transaction.value : 0n,
-        amountOut: BigInt(event.args.value),
-        router: txTo || ("0x0000000000000000000000000000000000000000" as Address),
-        methodSignature: event.transaction.input.slice(0, 10),
-      };
-
-      // Check if this is a swap to USDC from native token
-      const isCampaignRelevant = event.transaction.value > 0n &&
-        CAMPAIGN_TOKENS[5115]?.[event.log.address.toLowerCase()];
-
-      if (isCampaignRelevant) {
-        await processSwap(swapData, context);
-      }
-    } catch (error) {
-      console.error("Error processing USDC transfer:", error);
+  try {
+    // Validate required event properties
+    if (!event.block || !event.transaction || !event.log || !event.args) {
+      console.error("Missing required event properties for CBTC/USDC pool swap");
+      return;
     }
+
+    processedTxns.add(event.transaction.hash);
+
+    // Create swap data from the Swap event
+    const swapData = {
+      txHash: event.transaction.hash,
+      chainId: 5115,
+      blockNumber: BigInt(event.block.number),
+      blockTimestamp: BigInt(event.block.timestamp),
+      poolAddress: getAddress(event.log.address),
+      sender: getAddress(event.args.sender),
+      recipient: getAddress(event.args.recipient),
+      amount0: event.args.amount0,
+      amount1: event.args.amount1,
+      sqrtPriceX96: event.args.sqrtPriceX96,
+      liquidity: event.args.liquidity,
+      tick: event.args.tick,
+      router: event.transaction.to ? getAddress(event.transaction.to) : getAddress(event.args.sender),
+      methodSignature: event.transaction.input.slice(0, 10),
+    };
+
+    // Get campaign pool info
+    const campaignPool = CAMPAIGN_POOLS[swapData.chainId]?.[swapData.poolAddress.toLowerCase()];
+    const isCampaignRelevant = !!campaignPool && campaignPool.taskId === 3;
+
+    // Determine amounts for storage (use absolute values)
+    const amountIn = swapData.amount0 < BigInt(0) ? -swapData.amount0 : swapData.amount0;
+    const amountOut = swapData.amount1 > BigInt(0) ? swapData.amount1 : -swapData.amount1;
+
+    // Store swap record
+    await db.insert("swap").values({
+      id: swapData.txHash,
+      txHash: swapData.txHash,
+      chainId: swapData.chainId,
+      blockNumber: swapData.blockNumber,
+      blockTimestamp: swapData.blockTimestamp,
+      from: swapData.sender,
+      to: swapData.recipient,
+      tokenIn: swapData.poolAddress,
+      tokenOut: swapData.poolAddress,
+      amountIn,
+      amountOut,
+      router: swapData.router,
+      methodSignature: swapData.methodSignature,
+      isCampaignRelevant,
+      campaignTaskId: campaignPool?.taskId,
+    });
+
+    // If campaign relevant, process task completion
+    if (isCampaignRelevant && campaignPool) {
+      const progressId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}`;
+      const completionId = `${swapData.chainId}:${swapData.recipient.toLowerCase()}:${3}`;
+
+      // Ensure campaign progress exists
+      await db.insert("campaignProgress").values({
+        id: progressId,
+        walletAddress: swapData.recipient,
+        chainId: swapData.chainId,
+        createdAt: swapData.blockTimestamp,
+        updatedAt: swapData.blockTimestamp,
+      }).onConflictDoUpdate({
+        target: "id",
+        set: {
+          updatedAt: swapData.blockTimestamp,
+        },
+      });
+
+      // Record task completion
+      await db.insert("taskCompletion").values({
+        id: completionId,
+        walletAddress: swapData.recipient,
+        chainId: swapData.chainId,
+        taskId: 3,
+        txHash: swapData.txHash,
+        completedAt: swapData.blockTimestamp,
+        swapAmount: amountOut,
+        inputToken: swapData.poolAddress,
+        outputToken: swapData.poolAddress,
+        blockNumber: swapData.blockNumber,
+      }).onConflictDoNothing();
+    }
+
+    // Update campaign stats
+    const [totalUsersResult] = await db.sql`SELECT COUNT(*) as count FROM "campaignProgress" WHERE "chainId" = ${swapData.chainId}`;
+    const [totalSwapsResult] = await db.sql`SELECT COUNT(*) as count FROM "swap" WHERE "chainId" = ${swapData.chainId} AND "isCampaignRelevant" = true`;
+    const [task1Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 1`;
+    const [task2Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 2`;
+    const [task3Result] = await db.sql`SELECT COUNT(*) as count FROM "taskCompletion" WHERE "chainId" = ${swapData.chainId} AND "taskId" = 3`;
+    const swapsResult = await db.sql`SELECT "amountOut" FROM "swap" WHERE "chainId" = ${swapData.chainId} AND "isCampaignRelevant" = true`;
+
+    const totalUsers = Number(totalUsersResult.count);
+    const totalSwaps = Number(totalSwapsResult.count);
+    const task1Completions = Number(task1Result.count);
+    const task2Completions = Number(task2Result.count);
+    const task3Completions = Number(task3Result.count);
+    const totalVolume = swapsResult.reduce((sum: bigint, row: any) => sum + BigInt(row.amountOut), BigInt(0));
+
+    await db.insert("campaignStats").values({
+      id: swapData.chainId.toString(),
+      chainId: swapData.chainId,
+      totalUsers,
+      totalSwaps,
+      totalVolume,
+      task1Completions,
+      task2Completions,
+      task3Completions,
+      lastUpdated: BigInt(Date.now()),
+    }).onConflictDoUpdate({
+      target: "id",
+      set: {
+        totalUsers,
+        totalSwaps,
+        totalVolume,
+        task1Completions,
+        task2Completions,
+        task3Completions,
+        lastUpdated: BigInt(Date.now()),
+      },
+    });
+  } catch (error) {
+    console.error("Error processing CBTC/USDC pool swap:", error);
   }
 });
 
@@ -215,252 +470,35 @@ ponder.on("USDC_CitreaTestnet:Transfer", async ({ event, context }) => {
 // Uncomment and update addresses when deploying to other chains
 
 // CITREA MAINNET HANDLERS (Chain ID: 62298)
-// ponder.on("JuiceSwapRouter02_CitreaMainnet:call", async ({ event, context }) => {
-//   const { client, db } = context;
-//   try {
-//     const receipt = await client.getTransactionReceipt({
-//       hash: event.transaction.hash
-//     });
-//     const swapData = await analyzeSwapTransaction(receipt, event, context, 62298);
-//     if (swapData) {
-//       await processSwap(swapData, context);
-//     }
-//   } catch (error) {
-//     console.error("Error processing Citrea mainnet router call:", error);
-//   }
+// ponder.on("CBTCNUSDPool_CitreaMainnet:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
+// });
+// ponder.on("CBTCcUSDPool_CitreaMainnet:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
+// });
+// ponder.on("CBTCUSDCPool_CitreaMainnet:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
 // });
 
 // ETHEREUM MAINNET HANDLERS (Chain ID: 1)
-// ponder.on("UniswapV3Router_Ethereum:call", async ({ event, context }) => {
-//   const { client, db } = context;
-//   try {
-//     const receipt = await client.getTransactionReceipt({
-//       hash: event.transaction.hash
-//     });
-//     const swapData = await analyzeSwapTransaction(receipt, event, context, 1);
-//     if (swapData) {
-//       await processSwap(swapData, context);
-//     }
-//   } catch (error) {
-//     console.error("Error processing Ethereum router call:", error);
-//   }
+// ponder.on("ETHUSDTPool_Ethereum:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
+// });
+// ponder.on("ETHUSDCPool_Ethereum:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
+// });
+// ponder.on("ETHDAIPool_Ethereum:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
 // });
 
 // SEPOLIA TESTNET HANDLERS (Chain ID: 11155111)
-// ponder.on("UniswapV3Router_Sepolia:call", async ({ event, context }) => {
-//   const { client, db } = context;
-//   try {
-//     const receipt = await client.getTransactionReceipt({
-//       hash: event.transaction.hash
-//     });
-//     const swapData = await analyzeSwapTransaction(receipt, event, context, 11155111);
-//     if (swapData) {
-//       await processSwap(swapData, context);
-//     }
-//   } catch (error) {
-//     console.error("Error processing Sepolia router call:", error);
-//   }
+// ponder.on("WETHUSDTPool_Sepolia:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
 // });
-
-// Helper Functions
-async function analyzeSwapTransaction(
-  receipt: any,
-  transaction: any,
-  context: any,
-  chainId: number
-): Promise<SwapAnalysisResult | null> {
-  const { block } = context;
-
-  // Look for Transfer events in the transaction
-  const transferEvents = receipt.logs.filter((log) =>
-    log.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" // Transfer event signature
-  );
-
-  if (transferEvents.length < 2) return null;
-
-  // Analyze transfer pattern to identify swap
-  const from = transaction.from;
-  let tokenIn: string | null = null;
-  let tokenOut: string | null = null;
-  let amountIn = 0n;
-  let amountOut = 0n;
-
-  // Find input and output tokens from transfers
-  for (const transferLog of transferEvents) {
-    const tokenAddress = getAddress(transferLog.address);
-    const fromAddr = getAddress(`0x${transferLog.topics[1].slice(26)}`);
-    const toAddr = getAddress(`0x${transferLog.topics[2].slice(26)}`);
-    const amount = BigInt(transferLog.data);
-
-    // Input token: user transfers to router/pool
-    if (isAddressEqual(fromAddr, from)) {
-      tokenIn = tokenAddress;
-      amountIn = amount;
-    }
-
-    // Output token: router/pool transfers to user
-    if (isAddressEqual(toAddr, from)) {
-      tokenOut = tokenAddress;
-      amountOut = amount;
-    }
-  }
-
-  // Check if this involves native token (ETH/cBTC/etc.)
-  if (transaction.value > 0n) {
-    tokenIn = "0x0000000000000000000000000000000000000000"; // Native token
-    amountIn = transaction.value;
-  }
-
-  if (!tokenOut) return null;
-
-  return {
-    txHash: transaction.hash,
-    chainId,
-    blockNumber: BigInt(block.number),
-    blockTimestamp: BigInt(block.timestamp),
-    from: getAddress(from),
-    to: getAddress(transaction.to || "0x0"),
-    tokenIn: tokenIn ? getAddress(tokenIn) : ("0x0000000000000000000000000000000000000000" as Address),
-    tokenOut: getAddress(tokenOut),
-    amountIn,
-    amountOut,
-    router: getAddress(transaction.to || "0x0"),
-    methodSignature: transaction.input.slice(0, 10),
-  };
-}
-
-async function processSwap(swapData: any, context: any): Promise<void> {
-  const { db } = context;
-
-  // Check if this is a campaign-relevant swap
-  const campaignToken = CAMPAIGN_TOKENS[swapData.chainId]?.[swapData.tokenOut.toLowerCase()];
-  const nativeToken = "0x0000000000000000000000000000000000000000" as Address;
-  const isCampaignRelevant = !!campaignToken && swapData.tokenIn === nativeToken;
-
-  // Store swap record
-  await db.swap.create({
-    id: swapData.txHash,
-    data: {
-      txHash: swapData.txHash,
-      chainId: swapData.chainId,
-      blockNumber: swapData.blockNumber,
-      blockTimestamp: swapData.blockTimestamp,
-      from: swapData.from,
-      to: swapData.to,
-      tokenIn: swapData.tokenIn,
-      tokenOut: swapData.tokenOut,
-      amountIn: swapData.amountIn,
-      amountOut: swapData.amountOut,
-      router: swapData.router,
-      methodSignature: swapData.methodSignature,
-      isCampaignRelevant,
-      campaignTaskId: campaignToken?.taskId,
-    },
-  });
-
-  // If campaign relevant, process task completion
-  if (isCampaignRelevant && campaignToken) {
-    await processTaskCompletion(swapData, campaignToken.taskId, context);
-  }
-
-  // Update campaign stats
-  await updateCampaignStats(swapData.chainId, context);
-}
-
-async function processTaskCompletion(
-  swapData: SwapAnalysisResult,
-  taskId: number,
-  context: PonderContext
-): Promise<void> {
-  const { db } = context;
-
-  const progressId = `${swapData.chainId}:${swapData.from.toLowerCase()}`;
-  const completionId = `${swapData.chainId}:${swapData.from.toLowerCase()}:${taskId}`;
-
-  // Ensure campaign progress exists
-  await db.campaignProgress.upsert({
-    id: progressId,
-    create: {
-      walletAddress: swapData.from,
-      chainId: swapData.chainId,
-      createdAt: swapData.blockTimestamp,
-      updatedAt: swapData.blockTimestamp,
-    },
-    update: {
-      updatedAt: swapData.blockTimestamp,
-    },
-  });
-
-  // Record task completion (only if not already completed)
-  await db.taskCompletion.upsert({
-    id: completionId,
-    create: {
-      walletAddress: swapData.from,
-      chainId: swapData.chainId,
-      taskId,
-      txHash: swapData.txHash,
-      completedAt: swapData.blockTimestamp,
-      swapAmount: swapData.amountOut,
-      inputToken: swapData.tokenIn,
-      outputToken: swapData.tokenOut,
-      blockNumber: swapData.blockNumber,
-    },
-    update: {}, // Don't overwrite existing completions
-  });
-}
-
-async function updateCampaignStats(chainId: number, context: PonderContext): Promise<void> {
-  const { db } = context;
-
-  // Get current stats counts
-  const totalUsers = await db.campaignProgress.count({
-    where: { chainId },
-  });
-
-  const totalSwaps = await db.swap.count({
-    where: { chainId, isCampaignRelevant: true },
-  });
-
-  const task1Completions = await db.taskCompletion.count({
-    where: { chainId, taskId: 1 },
-  });
-
-  const task2Completions = await db.taskCompletion.count({
-    where: { chainId, taskId: 2 },
-  });
-
-  const task3Completions = await db.taskCompletion.count({
-    where: { chainId, taskId: 3 },
-  });
-
-  // Calculate total volume
-  const swaps = await db.swap.findMany({
-    where: { chainId, isCampaignRelevant: true },
-  });
-
-  const totalVolume = swaps.reduce((sum, swap) => sum + swap.amountOut, 0n);
-
-  await db.campaignStats.upsert({
-    id: chainId.toString(),
-    create: {
-      chainId,
-      totalUsers,
-      totalSwaps,
-      totalVolume,
-      task1Completions,
-      task2Completions,
-      task3Completions,
-      lastUpdated: BigInt(Date.now()),
-    },
-    update: {
-      totalUsers,
-      totalSwaps,
-      totalVolume,
-      task1Completions,
-      task2Completions,
-      task3Completions,
-      lastUpdated: BigInt(Date.now()),
-    },
-  });
-}
+// ponder.on("WETHUSDCPool_Sepolia:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
+// });
+// ponder.on("WETHDAIPool_Sepolia:Swap", async ({ event, context }) => {
+//   // Implementation similar to testnet handlers
+// });
 
