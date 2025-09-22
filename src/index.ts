@@ -119,32 +119,22 @@ const KNOWN_ROUTERS: Record<number, string[]> = {
 //   }
 // });
 
-// Initialize campaign tokens
-ponder.on("NUSD_CitreaTestnet:Transfer" as any, async ({ event, context }: any) => {
-  await initializeToken(
-    "0x9B28B690550522608890C3C7e63c0b4A7eBab9AA",
-    5115,
-    { symbol: "NUSD", name: "NUSD", decimals: 18, taskId: 1 },
-    context
-  );
+// Token Transfer event handlers
+// For now, we just track Transfer events but don't process them
+// Token metadata is handled in the campaign token mapping
+ponder.on("NUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
+  // Transfer events are tracked but not processed
+  // Token info is available in CAMPAIGN_TOKENS mapping
 });
 
-ponder.on("cUSD_CitreaTestnet:Transfer" as any, async ({ event, context }: any) => {
-  await initializeToken(
-    "0x2fFC18aC99D367b70dd922771dF8c2074af4aCE0",
-    5115,
-    { symbol: "cUSD", name: "cUSD", decimals: 18, taskId: 2 },
-    context
-  );
+ponder.on("cUSD_CitreaTestnet:Transfer", async ({ event, context }) => {
+  // Transfer events are tracked but not processed
+  // Token info is available in CAMPAIGN_TOKENS mapping
 });
 
-ponder.on("USDC_CitreaTestnet:Transfer" as any, async ({ event, context }: any) => {
-  await initializeToken(
-    "0x36c16eaC6B0Ba6c50f494914ff015fCa95B7835F",
-    5115,
-    { symbol: "USDC", name: "USDC", decimals: 6, taskId: 3 },
-    context
-  );
+ponder.on("USDC_CitreaTestnet:Transfer", async ({ event, context }) => {
+  // Transfer events are tracked but not processed
+  // Token info is available in CAMPAIGN_TOKENS mapping
 });
 
 // ========================================
@@ -402,31 +392,3 @@ async function updateCampaignStats(chainId: number, context: PonderContext): Pro
   });
 }
 
-async function initializeToken(
-  address: string,
-  chainId: number,
-  metadata: { symbol: string; name: string; decimals: number; taskId?: number },
-  context: PonderContext
-): Promise<void> {
-  const { db } = context;
-
-  const tokenId = `${chainId}:${address.toLowerCase()}`;
-
-  try {
-    await db.token.upsert({
-      id: tokenId,
-      create: {
-        address: getAddress(address),
-        chainId,
-        symbol: metadata.symbol,
-        name: metadata.name,
-        decimals: metadata.decimals,
-        isCampaignToken: !!metadata.taskId,
-        campaignTaskId: metadata.taskId,
-      },
-      update: {},
-    });
-  } catch (error) {
-    console.error(`Error initializing token ${address} on chain ${chainId}:`, error);
-  }
-}
