@@ -1,0 +1,31 @@
+# Claude settings
+.claude/settings.local.json
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+
+# Logs
+logs/
+*.log
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Database files
+*.db
+*.sqlite
+
+# Ponder generated files
+.ponder/
+generated/
+
+# OS generated files
+.DS_Store
+Thumbs.db
