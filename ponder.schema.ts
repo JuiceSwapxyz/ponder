@@ -1,4 +1,4 @@
-import { onchainTable, index } from "@ponder/core";
+import { onchainTable, index } from "ponder";
 
 export const campaignProgress = onchainTable("campaign_progress", (t) => ({
   id: t.text().primaryKey(), // Format: {chainId}:{walletAddress}
