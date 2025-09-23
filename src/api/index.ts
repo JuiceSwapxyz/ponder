@@ -11,6 +11,9 @@ app.get("/campaign/progress", async (c) => {
     const walletAddress = c.req.query('walletAddress');
     const chainId = c.req.query('chainId');
 
+    // Log the API request
+    console.log(`📊 Campaign API (GET): wallet=${walletAddress}, chain=${chainId}`);
+
     // Validate input
     if (!walletAddress || !chainId) {
       return c.json({ error: "Missing walletAddress or chainId query parameters" }, 400);
@@ -23,16 +26,20 @@ app.get("/campaign/progress", async (c) => {
     // Normalize wallet address
     const normalizedAddress = String(walletAddress).toLowerCase();
 
-    // For testing, return mock data first
-    // TODO: Re-enable database query once we verify DB access works
-    // const taskCompletions = await db
-    //   .select()
-    //   .from(taskCompletion)
-    //   .where(and(
-    //     eq(taskCompletion.walletAddress, normalizedAddress),
-    //     eq(taskCompletion.chainId, Number(chainId))
-    //   ));
-    const taskCompletions: any[] = [];
+    // Query task completions for this wallet using Drizzle ORM
+    let taskCompletions: any[] = [];
+    try {
+      taskCompletions = await db
+        .select()
+        .from(taskCompletion)
+        .where(and(
+          eq(taskCompletion.walletAddress, normalizedAddress),
+          eq(taskCompletion.chainId, Number(chainId))
+        ));
+    } catch (dbError) {
+      console.warn(`Database query failed for ${normalizedAddress}, using empty results:`, dbError);
+      taskCompletions = [];
+    }
 
     // Define all campaign tasks
     const allTasks = [
@@ -89,6 +96,9 @@ app.get("/campaign/progress", async (c) => {
       claimTxHash: null
     };
 
+    // Log successful response
+    console.log(`✅ Campaign response: ${completedTasks}/${totalTasks} tasks (${progress.toFixed(0)}%) for ${String(walletAddress).slice(0,6)}...${String(walletAddress).slice(-4)}`);
+
     return c.json(response);
 
   } catch (error) {
@@ -103,6 +113,9 @@ app.post("/campaign/progress", async (c) => {
     const body = await c.req.json();
     const { walletAddress, chainId } = body;
 
+    // Log the API request
+    console.log(`📊 Campaign API (POST): wallet=${walletAddress}, chain=${chainId}`);
+
     // Validate input
     if (!walletAddress || !chainId) {
       return c.json({ error: "Missing walletAddress or chainId" }, 400);
@@ -115,16 +128,20 @@ app.post("/campaign/progress", async (c) => {
     // Normalize wallet address
     const normalizedAddress = walletAddress.toLowerCase();
 
-    // For testing, return mock data first
-    // TODO: Re-enable database query once we verify DB access works
-    // const taskCompletions = await db
-    //   .select()
-    //   .from(taskCompletion)
-    //   .where(and(
-    //     eq(taskCompletion.walletAddress, normalizedAddress),
-    //     eq(taskCompletion.chainId, chainId)
-    //   ));
-    const taskCompletions: any[] = [];
+    // Query task completions for this wallet using Drizzle ORM
+    let taskCompletions: any[] = [];
+    try {
+      taskCompletions = await db
+        .select()
+        .from(taskCompletion)
+        .where(and(
+          eq(taskCompletion.walletAddress, normalizedAddress),
+          eq(taskCompletion.chainId, chainId)
+        ));
+    } catch (dbError) {
+      console.warn(`Database query failed for ${normalizedAddress}, using empty results:`, dbError);
+      taskCompletions = [];
+    }
 
     // Define all campaign tasks
     const allTasks = [
@@ -180,6 +197,9 @@ app.post("/campaign/progress", async (c) => {
       nftClaimed: false, // Not implemented yet
       claimTxHash: null
     };
+
+    // Log successful response
+    console.log(`✅ Campaign response: ${completedTasks}/${totalTasks} tasks (${progress.toFixed(0)}%) for ${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}`);
 
     return c.json(response);
 
