@@ -1,40 +1,22 @@
-import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
-import cors from 'cors';
-import { getCampaignProgress, checkSwapTransaction, completeTask } from './controllers/campaignController';
+import { Hono } from "hono";
 
-const app = express();
-const PORT = process.env.PORT || 3003;
+const app = new Hono();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'JuiceSwap Campaign API' });
+app.get("/", (c) => {
+  return c.text("JuiceSwap Ponder API v1.0.0");
 });
 
-// Campaign endpoints
-app.post('/campaign/progress', getCampaignProgress);
-app.post('/campaign/check-swap', checkSwapTransaction);
-app.post('/campaign/complete-task', completeTask);
-
-// Error handling middleware
-const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
-  console.error('API Error:', error);
-  res.status(500).json({
-    error: 'Internal server error',
-    code: 'SERVER_ERROR'
+app.get("/api/info", (c) => {
+  return c.json({
+    name: "JuiceSwap Ponder",
+    version: "1.0.0",
+    chain: "citreaTestnet",
+    contracts: {
+      CBTCNUSDPool: "0x6006797369E2A595D31Df4ab3691044038AAa7FE",
+      CBTCcUSDPool: "0xA69De906B9A830Deb64edB97B2eb0848139306d2",
+      CBTCUSDCPool: "0xD8C7604176475eB8D350bC1EE452dA4442637C09"
+    }
   });
-};
-
-app.use(errorHandler);
-
-// Start server
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`🚀 JuiceSwap Campaign API running on port ${PORT}`);
-  });
-}
+});
 
 export default app;
