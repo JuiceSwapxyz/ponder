@@ -1,12 +1,13 @@
 import { createConfig } from "ponder";
 import { UniswapV3PoolAbi } from "./abis/UniswapV3Pool";
+import { citreaTransport } from "./citrea-transport-fix";
 
 export default createConfig({
   chains: {
     // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: "http://localhost:8545",
+      rpc: citreaTransport(process.env.CITREA_RPC_URL ?? "https://rpc.testnet.citrea.xyz"),
     },
   },
   contracts: {
