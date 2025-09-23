@@ -19,7 +19,7 @@ export default createConfig({
       filter: {
         event: "Swap",
       },
-      startBlock: 15750000,
+      startBlock: 15455001,
     },
     CBTCcUSDPool_CitreaTestnet: {
       chain: "citreaTestnet",
@@ -28,7 +28,7 @@ export default createConfig({
       filter: {
         event: "Swap",
       },
-      startBlock: 15750000,
+      startBlock: 15455001,
     },
     CBTCUSDCPool_CitreaTestnet: {
       chain: "citreaTestnet",
@@ -37,7 +37,7 @@ export default createConfig({
       filter: {
         event: "Swap",
       },
-      startBlock: 15750000,
+      startBlock: 15455001,
     },
   },
 });
