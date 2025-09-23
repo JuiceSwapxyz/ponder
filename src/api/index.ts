@@ -289,8 +289,16 @@ app.get("/campaign/health", async (c) => {
   });
 });
 
-// Get all tracked addresses that made API queries
-app.get("/campaign/tracked-addresses", async (c) => {
+// ADMIN ONLY - Get all tracked addresses that made API queries
+// TODO: Add authentication before production!
+app.get("/admin/tracked-addresses", async (c) => {
+  // Check for admin token
+  const authHeader = c.req.header('Authorization');
+  const adminToken = process.env.ADMIN_API_TOKEN || 'development-only-token';
+
+  if (!authHeader || authHeader !== `Bearer ${adminToken}`) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   try {
     // Get all unique addresses from the query log
     const queryLogs = await db
@@ -298,9 +306,9 @@ app.get("/campaign/tracked-addresses", async (c) => {
       .from(apiQueryLog)
       .orderBy(sql`${apiQueryLog.lastQueryAt} DESC`);
 
-    // Transform the data for response
+    // Transform the data for response - anonymize wallet addresses
     const trackedAddresses = queryLogs.map(log => ({
-      walletAddress: log.walletAddress,
+      walletAddress: `${log.walletAddress.slice(0, 6)}...${log.walletAddress.slice(-4)}`, // Anonymized
       chainId: log.chainId,
       queryCount: log.queryCount,
       firstQueryAt: new Date(Number(log.firstQueryAt)).toISOString(),
