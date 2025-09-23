@@ -61,3 +61,18 @@ export const campaignStats = onchainTable("campaign_stats", (t) => ({
   task3Completions: t.integer().notNull(),
   lastUpdated: t.bigint().notNull(),
 }));
+
+export const apiQueryLog = onchainTable("api_query_log", (t) => ({
+  id: t.text().primaryKey(), // Format: {timestamp}:{walletAddress}
+  walletAddress: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  endpoint: t.text().notNull(), // GET or POST /campaign/progress
+  queryCount: t.integer().notNull().default(1),
+  firstQueryAt: t.bigint().notNull(),
+  lastQueryAt: t.bigint().notNull(),
+  userAgent: t.text(),
+  ipAddress: t.text(),
+}), (table) => ({
+  walletIdx: index("wallet_idx").on(table.walletAddress),
+  timestampIdx: index("timestamp_idx").on(table.lastQueryAt),
+}));
