@@ -1,4 +1,6 @@
+// @ts-ignore
 import { ponder } from "ponder:registry";
+// @ts-ignore
 import { swap, campaignProgress, taskCompletion } from "ponder:schema";
 import { getAddress, isAddressEqual } from "viem";
 
@@ -105,7 +107,7 @@ async function processCampaignSwap(event: any, context: any, poolAddress: string
       chainId: chainId,
       createdAt: safeBigInt(blockTimestamp),
       updatedAt: safeBigInt(blockTimestamp),
-    }).onConflictDoUpdate((row) => ({
+    }).onConflictDoUpdate((row: any) => ({
       updatedAt: safeBigInt(blockTimestamp),
     }));
 
@@ -132,7 +134,7 @@ async function processCampaignSwap(event: any, context: any, poolAddress: string
 }
 
 // CBTC/NUSD Pool Handler (Task 1)
-ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
+ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }: { event: any; context: any }) => {
   const poolAddress = "0x6006797369E2A595D31Df4ab3691044038AAa7FE";
   const poolInfo = CAMPAIGN_POOLS[poolAddress];
 
@@ -144,7 +146,7 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
 });
 
 // CBTC/cUSD Pool Handler (Task 2)
-ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
+ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }: { event: any; context: any }) => {
   const poolAddress = "0xA69De906B9A830Deb64edB97B2eb0848139306d2";
   const poolInfo = CAMPAIGN_POOLS[poolAddress];
 
@@ -156,7 +158,7 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }) => {
 });
 
 // CBTC/USDC Pool Handler (Task 3)
-ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }) => {
+ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }: { event: any; context: any }) => {
   const poolAddress = "0xD8C7604176475eB8D350bC1EE452dA4442637C09";
   const poolInfo = CAMPAIGN_POOLS[poolAddress];
 

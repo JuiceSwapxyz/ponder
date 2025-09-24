@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+// @ts-ignore
 import { db } from "ponder:api";
+// @ts-ignore
 import { taskCompletion } from "ponder:schema";
 // @ts-ignore
 import { apiQueryLog } from "ponder:schema";
@@ -307,7 +309,7 @@ app.get("/admin/tracked-addresses", async (c) => {
       .orderBy(sql`${apiQueryLog.lastQueryAt} DESC`);
 
     // Transform the data for response - anonymize wallet addresses
-    const trackedAddresses = queryLogs.map(log => ({
+    const trackedAddresses = queryLogs.map((log: any) => ({
       walletAddress: `${log.walletAddress.slice(0, 6)}...${log.walletAddress.slice(-4)}`, // Anonymized
       chainId: log.chainId,
       queryCount: log.queryCount,
@@ -317,7 +319,7 @@ app.get("/admin/tracked-addresses", async (c) => {
     }));
 
     // Calculate summary statistics
-    const totalQueries = trackedAddresses.reduce((sum, addr) => sum + addr.queryCount, 0);
+    const totalQueries = trackedAddresses.reduce((sum: number, addr: any) => sum + addr.queryCount, 0);
     const uniqueAddresses = trackedAddresses.length;
 
     return c.json({

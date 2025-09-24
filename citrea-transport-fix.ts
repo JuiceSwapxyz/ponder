@@ -1,4 +1,4 @@
-import { http, type Transport, type TransportConfig } from "viem";
+import { http } from "viem";
 
 /**
  * Sanitizes an object to prevent Reflect.get errors by ensuring all properties are proper objects.
@@ -56,10 +56,10 @@ function sanitizeObject(obj: any): any {
  * 1. Invalid transactionIndex values in eth_getLogs responses
  * 2. Problematic data structures that cause Reflect.get errors
  */
-export function citreaTransport(url: string): Transport {
+export function citreaTransport(url: string): any {
   const baseTransport = http(url);
 
-  return (config: TransportConfig) => {
+  return (config: any) => {
     const transport = baseTransport(config);
     const originalRequest = transport.request;
 

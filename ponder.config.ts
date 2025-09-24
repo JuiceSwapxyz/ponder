@@ -18,7 +18,8 @@ export default createConfig({
       abi: UniswapV3PoolAbi,
       filter: {
         event: "Swap",
-      },
+        args: {},
+      } as any,
       startBlock: 15455001,
     },
     CBTCcUSDPool_CitreaTestnet: {
@@ -27,7 +28,8 @@ export default createConfig({
       abi: UniswapV3PoolAbi,
       filter: {
         event: "Swap",
-      },
+        args: {},
+      } as any,
       startBlock: 15455001,
     },
     CBTCUSDCPool_CitreaTestnet: {
@@ -36,7 +38,8 @@ export default createConfig({
       abi: UniswapV3PoolAbi,
       filter: {
         event: "Swap",
-      },
+        args: {},
+      } as any,
       startBlock: 15455001,
     },
   },
