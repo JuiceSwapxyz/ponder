@@ -14,8 +14,8 @@ COPY . .
 # Build the project
 RUN npm run build
 
-# Expose ports
-EXPOSE 42069 3003
+# Expose port
+EXPOSE 42069
 
-# Start both Ponder and API
-CMD ["sh", "-c", "npm start & npm run api"]
+# Start Ponder (includes built-in API)
+CMD ["npm", "start"]
