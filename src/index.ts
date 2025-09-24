@@ -1,7 +1,7 @@
 // @ts-ignore
 import { ponder } from "ponder:registry";
 // @ts-ignore
-import { swap, campaignProgress, taskCompletion } from "ponder:schema";
+import { swap, taskCompletion } from "ponder:schema";
 import { getAddress, isAddressEqual } from "viem";
 
 // Campaign Configuration - Maps pool addresses to tasks
@@ -96,22 +96,8 @@ async function processCampaignSwap(event: any, context: any, poolAddress: string
       campaignTaskId: taskId,
     });
 
-    // Campaign progress tracking
-    const progressId = `${chainId}:${walletAddress.toLowerCase()}`;
-    const completionId = `${chainId}:${walletAddress.toLowerCase()}:${taskId}`;
-
-    // Ensure campaign progress exists
-    await context.db.insert(campaignProgress).values({
-      id: progressId,
-      walletAddress: walletAddress,
-      chainId: chainId,
-      createdAt: safeBigInt(blockTimestamp),
-      updatedAt: safeBigInt(blockTimestamp),
-    }).onConflictDoUpdate((row: any) => ({
-      updatedAt: safeBigInt(blockTimestamp),
-    }));
-
     // Record task completion (prevent duplicates)
+    const completionId = `${chainId}:${walletAddress.toLowerCase()}:${taskId}`;
     await context.db.insert(taskCompletion).values({
       id: completionId,
       walletAddress: walletAddress,

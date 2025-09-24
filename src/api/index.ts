@@ -3,9 +3,7 @@ import { Hono } from "hono";
 import { db } from "ponder:api";
 // @ts-ignore
 import { taskCompletion } from "ponder:schema";
-// @ts-ignore
-import { apiQueryLog } from "ponder:schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const app = new Hono();
 
@@ -23,32 +21,6 @@ app.get("/campaign/progress", async (c) => {
       return c.json({ error: "Missing walletAddress or chainId query parameters" }, 400);
     }
 
-    // Log query to database
-    try {
-      const timestamp = BigInt(Date.now());
-      const logId = `${timestamp}:${String(walletAddress).toLowerCase()}`;
-      const userAgent = c.req.header('user-agent') || null;
-      const ipAddress = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || null;
-
-      await db.insert(apiQueryLog).values({
-        id: logId,
-        walletAddress: String(walletAddress).toLowerCase(),
-        chainId: Number(chainId),
-        endpoint: 'GET /campaign/progress',
-        queryCount: 1,
-        firstQueryAt: timestamp,
-        lastQueryAt: timestamp,
-        userAgent: userAgent,
-        ipAddress: ipAddress,
-      }).onConflictDoUpdate((row: any) => ({
-        queryCount: sql`${row.queryCount} + 1`,
-        lastQueryAt: timestamp,
-        userAgent: userAgent,
-        ipAddress: ipAddress,
-      }));
-    } catch (logError) {
-      console.warn('Failed to log API query:', logError);
-    }
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -152,45 +124,6 @@ app.post("/campaign/progress", async (c) => {
       return c.json({ error: "Missing walletAddress or chainId" }, 400);
     }
 
-    // Log query to database
-    try {
-      const timestamp = BigInt(Date.now());
-      // const logId = `${walletAddress.toLowerCase()}`; // Not used directly
-      const userAgent = c.req.header('user-agent') || null;
-      const ipAddress = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || null;
-
-      // Check if this wallet already has a log entry
-      const existing = await db.select().from(apiQueryLog)
-        .where(eq(apiQueryLog.walletAddress, walletAddress.toLowerCase()))
-        .limit(1);
-
-      if (existing.length > 0) {
-        // Update existing entry
-        await db.update(apiQueryLog)
-          .set({
-            queryCount: sql`${apiQueryLog.queryCount} + 1`,
-            lastQueryAt: timestamp,
-            userAgent: userAgent,
-            ipAddress: ipAddress,
-          })
-          .where(eq(apiQueryLog.walletAddress, walletAddress.toLowerCase()));
-      } else {
-        // Create new entry
-        await db.insert(apiQueryLog).values({
-          id: `${timestamp}:${walletAddress.toLowerCase()}`,
-          walletAddress: walletAddress.toLowerCase(),
-          chainId: chainId,
-          endpoint: 'POST /campaign/progress',
-          queryCount: 1,
-          firstQueryAt: timestamp,
-          lastQueryAt: timestamp,
-          userAgent: userAgent,
-          ipAddress: ipAddress,
-        });
-      }
-    } catch (logError) {
-      console.warn('Failed to log API query:', logError);
-    }
 
     if (chainId !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -286,56 +219,11 @@ app.get("/campaign/health", async (c) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     chains: ["citreaTestnet"],
-    features: ["campaign-progress", "query-tracking"],
+    features: ["campaign-progress"],
     version: "1.0.0"
   });
 });
 
-// ADMIN ONLY - Get all tracked addresses that made API queries
-// TODO: Add authentication before production!
-app.get("/admin/tracked-addresses", async (c) => {
-  // Check for admin token
-  const authHeader = c.req.header('Authorization');
-  const adminToken = process.env.ADMIN_API_TOKEN || 'development-only-token';
-
-  if (!authHeader || authHeader !== `Bearer ${adminToken}`) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-  try {
-    // Get all unique addresses from the query log
-    const queryLogs = await db
-      .select()
-      .from(apiQueryLog)
-      .orderBy(sql`${apiQueryLog.lastQueryAt} DESC`);
-
-    // Transform the data for response - anonymize wallet addresses
-    const trackedAddresses = queryLogs.map((log: any) => ({
-      walletAddress: `${log.walletAddress.slice(0, 6)}...${log.walletAddress.slice(-4)}`, // Anonymized
-      chainId: log.chainId,
-      queryCount: log.queryCount,
-      firstQueryAt: new Date(Number(log.firstQueryAt)).toISOString(),
-      lastQueryAt: new Date(Number(log.lastQueryAt)).toISOString(),
-      endpoint: log.endpoint,
-    }));
-
-    // Calculate summary statistics
-    const totalQueries = trackedAddresses.reduce((sum: number, addr: any) => sum + addr.queryCount, 0);
-    const uniqueAddresses = trackedAddresses.length;
-
-    return c.json({
-      summary: {
-        uniqueAddresses,
-        totalQueries,
-        timestamp: new Date().toISOString(),
-      },
-      addresses: trackedAddresses,
-    });
-
-  } catch (error) {
-    console.error("Error fetching tracked addresses:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-});
 
 // Info endpoint
 app.get("/api/info", async (c) => {
