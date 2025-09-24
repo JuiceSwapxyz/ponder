@@ -9,7 +9,7 @@ on:
 
 env:
   DOCKER_TAGS: dfxswiss/juiceswap-ponder:beta
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   test:
