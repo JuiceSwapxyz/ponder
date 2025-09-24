@@ -3,6 +3,8 @@ name: JuiceSwap Ponder DEV CI/CD
 on:
   push:
     branches: [develop]
+  pull_request:
+    branches: [develop]
   workflow_dispatch:
 
 env:
