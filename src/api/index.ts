@@ -296,6 +296,55 @@ app.get("/campaign/addresses", async (c: Context) => {
   }
 });
 
+// Campaign statistics endpoint
+app.get("/campaign/stats", async (c: Context) => {
+  try {
+    const chainId = c.req.query('chainId') || '5115';
+
+    console.log(`📊 Getting campaign statistics for chain=${chainId}`);
+
+    if (Number(chainId) !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    // Get all unique wallet addresses from taskCompletion table
+    const allCompletions = await db
+      .select()
+      .from(taskCompletion)
+      .where(eq(taskCompletion.chainId, Number(chainId)));
+
+    // Group by wallet address and count completed tasks
+    const addressMap = new Map<string, number>();
+
+    for (const completion of allCompletions) {
+      const address = completion.walletAddress;
+      const currentCount = addressMap.get(address) || 0;
+      addressMap.set(address, currentCount + 1);
+    }
+
+    // Count addresses with all 3 tasks completed
+    let addressesWithAllTasks = 0;
+    for (const [_, taskCount] of addressMap) {
+      if (taskCount === 3) {
+        addressesWithAllTasks++;
+      }
+    }
+
+    const response = {
+      totalParticipants: addressMap.size,
+      completedAllTasks: addressesWithAllTasks
+    };
+
+    console.log(`✅ Campaign stats: ${response.totalParticipants} participants, ${response.completedAllTasks} completed`);
+
+    return c.json(response);
+
+  } catch (error) {
+    console.error("Campaign stats API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 // Info endpoint
 app.get("/api/info", async (c: Context) => {
   return c.json({
