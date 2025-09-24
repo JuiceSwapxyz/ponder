@@ -1,12 +1,207 @@
 import { Hono } from "hono";
+import { db } from "ponder:api";
+import { taskCompletion } from "ponder:schema";
+import { eq, and } from "drizzle-orm";
 
 const app = new Hono();
 
-app.get("/", (c) => {
-  return c.text("JuiceSwap Ponder API v1.0.0");
+// Campaign Progress API Endpoint (GET with query params)
+app.get("/campaign/progress", async (c) => {
+  try {
+    const walletAddress = c.req.query('walletAddress');
+    const chainId = c.req.query('chainId');
+
+    // Validate input
+    if (!walletAddress || !chainId) {
+      return c.json({ error: "Missing walletAddress or chainId query parameters" }, 400);
+    }
+
+    if (Number(chainId) !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    // Normalize wallet address
+    const normalizedAddress = String(walletAddress).toLowerCase();
+
+    // For testing, return mock data first
+    // TODO: Re-enable database query once we verify DB access works
+    // const taskCompletions = await db
+    //   .select()
+    //   .from(taskCompletion)
+    //   .where(and(
+    //     eq(taskCompletion.walletAddress, normalizedAddress),
+    //     eq(taskCompletion.chainId, Number(chainId))
+    //   ));
+    const taskCompletions: any[] = [];
+
+    // Define all campaign tasks
+    const allTasks = [
+      {
+        id: 1,
+        name: "Swap cBTC to NUSD",
+        description: "Complete a swap from cBTC to NUSD",
+        completed: false,
+        completedAt: null as string | null,
+        txHash: null as string | null
+      },
+      {
+        id: 2,
+        name: "Swap cBTC to cUSD",
+        description: "Complete a swap from cBTC to cUSD",
+        completed: false,
+        completedAt: null as string | null,
+        txHash: null as string | null
+      },
+      {
+        id: 3,
+        name: "Swap cBTC to USDC",
+        description: "Complete a swap from cBTC to USDC",
+        completed: false,
+        completedAt: null as string | null,
+        txHash: null as string | null
+      }
+    ];
+
+    // Update tasks with completion data
+    for (const completion of taskCompletions) {
+      const task = allTasks.find(t => t.id === completion.taskId);
+      if (task) {
+        task.completed = true;
+        task.completedAt = new Date(Number(completion.completedAt) * 1000).toISOString();
+        task.txHash = completion.txHash;
+      }
+    }
+
+    // Calculate progress stats
+    const completedTasks = allTasks.filter(t => t.completed).length;
+    const totalTasks = allTasks.length;
+    const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    // Build response
+    const response = {
+      walletAddress: String(walletAddress),
+      chainId: Number(chainId),
+      tasks: allTasks,
+      totalTasks: totalTasks,
+      completedTasks: completedTasks,
+      progress: Number(progress.toFixed(2)),
+      nftClaimed: false, // Not implemented yet
+      claimTxHash: null
+    };
+
+    return c.json(response);
+
+  } catch (error) {
+    console.error("Campaign progress API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
 });
 
-app.get("/api/info", (c) => {
+// POST version for compatibility with requirements
+app.post("/campaign/progress", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { walletAddress, chainId } = body;
+
+    // Validate input
+    if (!walletAddress || !chainId) {
+      return c.json({ error: "Missing walletAddress or chainId" }, 400);
+    }
+
+    if (chainId !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    // Normalize wallet address
+    const normalizedAddress = walletAddress.toLowerCase();
+
+    // For testing, return mock data first
+    // TODO: Re-enable database query once we verify DB access works
+    // const taskCompletions = await db
+    //   .select()
+    //   .from(taskCompletion)
+    //   .where(and(
+    //     eq(taskCompletion.walletAddress, normalizedAddress),
+    //     eq(taskCompletion.chainId, chainId)
+    //   ));
+    const taskCompletions: any[] = [];
+
+    // Define all campaign tasks
+    const allTasks = [
+      {
+        id: 1,
+        name: "Swap cBTC to NUSD",
+        description: "Complete a swap from cBTC to NUSD",
+        completed: false,
+        completedAt: null as string | null,
+        txHash: null as string | null
+      },
+      {
+        id: 2,
+        name: "Swap cBTC to cUSD",
+        description: "Complete a swap from cBTC to cUSD",
+        completed: false,
+        completedAt: null as string | null,
+        txHash: null as string | null
+      },
+      {
+        id: 3,
+        name: "Swap cBTC to USDC",
+        description: "Complete a swap from cBTC to USDC",
+        completed: false,
+        completedAt: null as string | null,
+        txHash: null as string | null
+      }
+    ];
+
+    // Update tasks with completion data
+    for (const completion of taskCompletions) {
+      const task = allTasks.find(t => t.id === completion.taskId);
+      if (task) {
+        task.completed = true;
+        task.completedAt = new Date(Number(completion.completedAt) * 1000).toISOString();
+        task.txHash = completion.txHash;
+      }
+    }
+
+    // Calculate progress stats
+    const completedTasks = allTasks.filter(t => t.completed).length;
+    const totalTasks = allTasks.length;
+    const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    // Build response
+    const response = {
+      walletAddress: walletAddress,
+      chainId: chainId,
+      tasks: allTasks,
+      totalTasks: totalTasks,
+      completedTasks: completedTasks,
+      progress: Number(progress.toFixed(2)),
+      nftClaimed: false, // Not implemented yet
+      claimTxHash: null
+    };
+
+    return c.json(response);
+
+  } catch (error) {
+    console.error("Campaign progress API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// Health endpoint for campaign API
+app.get("/campaign/health", async (c) => {
+  return c.json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    chains: ["citreaTestnet"],
+    features: ["campaign-progress"],
+    version: "1.0.0"
+  });
+});
+
+// Info endpoint
+app.get("/api/info", async (c) => {
   return c.json({
     name: "JuiceSwap Ponder",
     version: "1.0.0",
