@@ -1,12 +1,13 @@
 import { createConfig } from "ponder";
 import { UniswapV3PoolAbi } from "./abis/UniswapV3Pool";
+import { citreaTransport } from "./citrea-transport-fix";
 
 export default createConfig({
   chains: {
     // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: "http://localhost:8545",
+      rpc: citreaTransport(process.env.CITREA_RPC_URL ?? "https://rpc.testnet.citrea.xyz"),
     },
   },
   contracts: {
@@ -18,7 +19,7 @@ export default createConfig({
       filter: {
         event: "Swap",
       },
-      startBlock: 15750000,
+      startBlock: 15455001,
     },
     CBTCcUSDPool_CitreaTestnet: {
       chain: "citreaTestnet",
@@ -27,7 +28,7 @@ export default createConfig({
       filter: {
         event: "Swap",
       },
-      startBlock: 15750000,
+      startBlock: 15455001,
     },
     CBTCUSDCPool_CitreaTestnet: {
       chain: "citreaTestnet",
@@ -36,7 +37,7 @@ export default createConfig({
       filter: {
         event: "Swap",
       },
-      startBlock: 15750000,
+      startBlock: 15455001,
     },
   },
 });
