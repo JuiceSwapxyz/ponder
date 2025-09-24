@@ -1,51 +1,51 @@
 export const UniswapV3PoolAbi = [
   {
-    "type": "event",
-    "name": "Swap",
-    "inputs": [
+    type: "event",
+    name: "Swap",
+    inputs: [
       {
-        "name": "sender",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "sender",
+        type: "address",
+        indexed: true,
+        internalType: "address"
       },
       {
-        "name": "recipient",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "recipient",
+        type: "address",
+        indexed: true,
+        internalType: "address"
       },
       {
-        "name": "amount0",
-        "type": "int256",
-        "indexed": false,
-        "internalType": "int256"
+        name: "amount0",
+        type: "int256",
+        indexed: false,
+        internalType: "int256"
       },
       {
-        "name": "amount1",
-        "type": "int256",
-        "indexed": false,
-        "internalType": "int256"
+        name: "amount1",
+        type: "int256",
+        indexed: false,
+        internalType: "int256"
       },
       {
-        "name": "sqrtPriceX96",
-        "type": "uint160",
-        "indexed": false,
-        "internalType": "uint160"
+        name: "sqrtPriceX96",
+        type: "uint160",
+        indexed: false,
+        internalType: "uint160"
       },
       {
-        "name": "liquidity",
-        "type": "uint128",
-        "indexed": false,
-        "internalType": "uint128"
+        name: "liquidity",
+        type: "uint128",
+        indexed: false,
+        internalType: "uint128"
       },
       {
-        "name": "tick",
-        "type": "int24",
-        "indexed": false,
-        "internalType": "int24"
+        name: "tick",
+        type: "int24",
+        indexed: false,
+        internalType: "int24"
       }
     ],
-    "anonymous": false
+    anonymous: false
   }
 ] as const;

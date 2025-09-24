@@ -1,12 +1,4 @@
-import { onchainTable, index } from "@ponder/core";
-
-export const campaignProgress = onchainTable("campaign_progress", (t) => ({
-  id: t.text().primaryKey(), // Format: {chainId}:{walletAddress}
-  walletAddress: t.hex().notNull(),
-  chainId: t.integer().notNull(),
-  createdAt: t.bigint().notNull(),
-  updatedAt: t.bigint().notNull(),
-}));
+import { onchainTable } from "ponder";
 
 export const taskCompletion = onchainTable("task_completion", (t) => ({
   id: t.text().primaryKey(), // Format: {chainId}:{walletAddress}:{taskId}
@@ -37,27 +29,4 @@ export const swap = onchainTable("swap", (t) => ({
   methodSignature: t.text().notNull(),
   isCampaignRelevant: t.boolean().notNull(),
   campaignTaskId: t.integer(),
-}));
-
-export const token = onchainTable("token", (t) => ({
-  id: t.text().primaryKey(), // Format: {chainId}:{address}
-  address: t.hex().notNull(),
-  chainId: t.integer().notNull(),
-  symbol: t.text(),
-  name: t.text(),
-  decimals: t.integer(),
-  isCampaignToken: t.boolean().notNull(),
-  campaignTaskId: t.integer(),
-}));
-
-export const campaignStats = onchainTable("campaign_stats", (t) => ({
-  id: t.text().primaryKey(), // Format: {chainId}
-  chainId: t.integer().notNull(),
-  totalUsers: t.integer().notNull(),
-  totalSwaps: t.integer().notNull(),
-  totalVolume: t.bigint().notNull(),
-  task1Completions: t.integer().notNull(),
-  task2Completions: t.integer().notNull(),
-  task3Completions: t.integer().notNull(),
-  lastUpdated: t.bigint().notNull(),
 }));

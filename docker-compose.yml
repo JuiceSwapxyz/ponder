@@ -4,18 +4,15 @@ services:
   ponder:
     build: .
     ports:
-      - "${PONDER_PORT:-42069}:42069"  # Ponder GraphQL API
-      - "${API_PORT:-3003}:3003"       # REST API wrapper
+      - "${PONDER_PORT:-42069}:42069" 
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - PONDER_GRAPHQL_URL=${PONDER_GRAPHQL_URL:-http://localhost:42069/graphql}
-      - DATABASE_URL=${DATABASE_URL}
-      - ETHEREUM_RPC_URL=${ETHEREUM_RPC_URL}
-      - SEPOLIA_RPC_URL=${SEPOLIA_RPC_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DATABASE_SCHEMA=public
+      - CITREA_RPC_URL=${CITREA_RPC_URL}
+      - ADMIN_API_TOKEN=${ADMIN_API_TOKEN}
     depends_on:
       - postgres
-    volumes:
-      - ./logs:/app/logs
     restart: unless-stopped
     env_file:
       - .env
