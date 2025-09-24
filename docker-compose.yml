@@ -4,10 +4,11 @@ services:
   ponder:
     build: .
     ports:
-      - "${PONDER_PORT:-42069}:42069"  # Ponder GraphQL API + Custom API
+      - "${PONDER_PORT:-42069}:42069" 
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DATABASE_SCHEMA=public
       - CITREA_RPC_URL=${CITREA_RPC_URL}
       - ADMIN_API_TOKEN=${ADMIN_API_TOKEN}
     depends_on:
