@@ -1,4 +1,5 @@
 import { Hono, Context } from "hono";
+import { cors } from "hono/cors";
 // @ts-ignore
 import { db } from "ponder:api";
 // @ts-ignore
@@ -6,6 +7,25 @@ import { taskCompletion } from "ponder:schema";
 import { eq, and } from "drizzle-orm";
 
 const app = new Hono();
+
+// Enable CORS for all juiceswap.com domains
+app.use('/*', cors({
+  origin: (origin) => {
+    if (!origin) return null;
+    // Allow all subdomains of juiceswap.com
+    if (origin.endsWith('.juiceswap.com') || origin === 'https://juiceswap.com') {
+      return origin;
+    }
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return origin;
+    }
+    return null;
+  },
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Campaign Progress API Endpoint (GET with query params)
 app.get("/campaign/progress", async (c) => {
