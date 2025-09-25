@@ -17,8 +17,5 @@ RUN npm run build
 # Expose port
 EXPOSE 42069
 
-# Run schema migration on container start
-ENTRYPOINT ["node", "schema-manager.js"]
-
-# Start ponder
-CMD ["npm", "start"]
+# Start with schema management then ponder
+CMD ["sh", "-c", "node schema-manager.js && npm start"]
