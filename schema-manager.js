@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { Client } = require("pg");
+import { Client } from "pg";
 
 async function getStoredSchemaVersion(database, schema) {
   try {
