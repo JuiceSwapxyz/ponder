@@ -11,6 +11,7 @@ services:
       - DATABASE_SCHEMA=public
       - CITREA_RPC_URL=${CITREA_RPC_URL}
       - ADMIN_API_TOKEN=${ADMIN_API_TOKEN}
+      - PONDER_SCHEMA_VERSION=1
     depends_on:
       - postgres
     restart: unless-stopped
