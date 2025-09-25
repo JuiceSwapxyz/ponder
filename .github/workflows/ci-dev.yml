@@ -8,8 +8,11 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKER_TAGS: dfxswiss/juiceswap-ponder:beta
   NODE_VERSION: '20'
+  DOCKER_TAGS: dfxswiss/juiceswap-ponder:beta
+  DEPLOY_INFO: ${{ github.ref_name }}-${{ github.sha }}
+  AZURE_RESOURCE_GROUP: rg-dfx-api-dev
+  AZURE_CONTAINER_APP: ca-dfx-jsp-dev
 
 jobs:
   test:
@@ -64,13 +67,24 @@ jobs:
           tags: ${{ env.DOCKER_TAGS }}
 
   deploy:
-    name: Deploy to Development
+    name: Deploy to DEV
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     environment: development
     steps:
-      - name: Deploy notification
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.DFX_DEV_CREDENTIALS }}
+
+      - name: Update Azure Container App
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az containerapp update --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} --image ${{ env.DOCKER_TAGS }} --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}
+
+      - name: Logout from Azure
         run: |
-          echo "🚀 Deployment to development environment would happen here"
-          # Add your deployment steps here (e.g., Kubernetes, AWS ECS, etc.)
+          az logout
+        if: always()

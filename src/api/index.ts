@@ -1,11 +1,46 @@
-import { Hono } from "hono";
+import { Hono, Context } from "hono";
+import { cors } from "hono/cors";
 // @ts-ignore
 import { db } from "ponder:api";
+// @ts-ignore
+import schema from "ponder:schema";
 // @ts-ignore
 import { taskCompletion } from "ponder:schema";
 import { eq, and } from "drizzle-orm";
 
+import { graphql } from "ponder"; // @ts-ignore
+
+// Import controllers
+import positions from "./controllers/positions";
+import pools from "./controllers/pools";
+
+
 const app = new Hono();
+
+// Enable CORS for all juiceswap.com domains
+app.use('/*', cors({
+  origin: (origin) => {
+    if (!origin) return null;
+    // Allow all subdomains of juiceswap.com
+    if (origin.endsWith('.juiceswap.com') || origin === 'https://juiceswap.com') {
+      return origin;
+    }
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return origin;
+    }
+    return null;
+  },
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use("/graphql", graphql({ db, schema })); 
+
+// Mount API controllers
+app.route("/positions", positions);
+app.route("/pools", pools);
 
 // Campaign Progress API Endpoint (GET with query params)
 app.get("/campaign/progress", async (c) => {
@@ -225,8 +260,128 @@ app.get("/campaign/health", async (c) => {
 });
 
 
+// Get all registered addresses with campaign progress
+app.get("/campaign/addresses", async (c: Context) => {
+  try {
+    const chainId = c.req.query('chainId') || '5115';
+
+    console.log(`📊 Getting all registered addresses for chain=${chainId}`);
+
+    if (Number(chainId) !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    // Get all unique wallet addresses from taskCompletion table
+    const allCompletions = await db
+      .select()
+      .from(taskCompletion)
+      .where(eq(taskCompletion.chainId, Number(chainId)));
+
+    // Group by wallet address and calculate progress
+    const addressMap = new Map<string, any>();
+
+    for (const completion of allCompletions) {
+      const address = completion.walletAddress;
+
+      if (!addressMap.has(address)) {
+        addressMap.set(address, {
+          walletAddress: address,
+          chainId: Number(chainId),
+          completedTasks: 0,
+          totalTasks: 3,
+          progress: 0,
+          tasks: {
+            1: false, // Swap cBTC to NUSD
+            2: false, // Swap cBTC to cUSD
+            3: false  // Swap cBTC to USDC
+          },
+          lastActivity: null as string | null
+        });
+      }
+
+      const userData = addressMap.get(address);
+      userData.tasks[completion.taskId] = true;
+
+      // Update last activity
+      const completedAt = new Date(Number(completion.completedAt) * 1000).toISOString();
+      if (!userData.lastActivity || completedAt > userData.lastActivity) {
+        userData.lastActivity = completedAt;
+      }
+    }
+
+    // Calculate progress for each address
+    const addresses = Array.from(addressMap.values()).map(userData => {
+      const completedCount = Object.values(userData.tasks).filter(Boolean).length;
+      return {
+        walletAddress: userData.walletAddress,
+        completedTasks: completedCount
+      };
+    });
+
+    // Return in database order (no sorting)
+    const response = addresses;
+
+    console.log(`✅ Found ${addresses.length} registered addresses`);
+
+    return c.json(response);
+
+  } catch (error) {
+    console.error("Get all addresses API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// Campaign statistics endpoint
+app.get("/campaign/stats", async (c: Context) => {
+  try {
+    const chainId = c.req.query('chainId') || '5115';
+
+    console.log(`📊 Getting campaign statistics for chain=${chainId}`);
+
+    if (Number(chainId) !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    // Get all unique wallet addresses from taskCompletion table
+    const allCompletions = await db
+      .select()
+      .from(taskCompletion)
+      .where(eq(taskCompletion.chainId, Number(chainId)));
+
+    // Group by wallet address and count completed tasks
+    const addressMap = new Map<string, number>();
+
+    for (const completion of allCompletions) {
+      const address = completion.walletAddress;
+      const currentCount = addressMap.get(address) || 0;
+      addressMap.set(address, currentCount + 1);
+    }
+
+    // Count addresses with all 3 tasks completed
+    let addressesWithAllTasks = 0;
+    for (const [_, taskCount] of addressMap) {
+      if (taskCount === 3) {
+        addressesWithAllTasks++;
+      }
+    }
+
+    const response = {
+      totalParticipants: addressMap.size,
+      completedAllTasks: addressesWithAllTasks
+    };
+
+    console.log(`✅ Campaign stats: ${response.totalParticipants} participants, ${response.completedAllTasks} completed`);
+
+    return c.json(response);
+
+  } catch (error) {
+    console.error("Campaign stats API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 // Info endpoint
-app.get("/api/info", async (c) => {
+app.get("/api/info", async (c: Context) => {
   return c.json({
     name: "JuiceSwap Ponder",
     version: "1.0.0",
