@@ -9,9 +9,10 @@ import { getAddress } from "viem";
 const positions = new Hono();
 
 // Get all positions for a specific owner
-positions.get("/owner/:address", async (c: Context) => {
+positions.post("/owner", async (c: Context) => {
   try {
-    const ownerAddress = c.req.param("address");
+    const body = await c.req.json();
+    const ownerAddress = body.address;
 
     if (!ownerAddress) {
       return c.json({ error: "Owner address is required" }, 400);
