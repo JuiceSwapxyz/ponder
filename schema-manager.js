@@ -49,6 +49,8 @@ async function storeSchemaVersion(database, schema, version) {
     );
 
     await client.end();
+
+    console.log(`Stored schema version ${version}`);
   } catch (error) {
     console.warn("Failed to store schema version:", error.message);
   }
