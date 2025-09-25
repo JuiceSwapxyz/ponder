@@ -61,12 +61,20 @@ async function performSchemaReset(database, schema) {
     const client = new Client({ connectionString: database });
     await client.connect();
 
-    // Drop and recreate the application schema
-    await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
-    await client.query(`CREATE SCHEMA ${schema}`);
+    const dropTablesInSchema = async (schemaName) => {
+      const tablesResult = await client.query(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = $1 AND table_type = 'BASE TABLE'
+      `, [schemaName]);
 
-    // Drop ponder_sync schema
-    await client.query(`DROP SCHEMA IF EXISTS ponder_sync CASCADE`);
+      for (const row of tablesResult.rows) {
+        await client.query(`DROP TABLE IF EXISTS ${schemaName}.${row.table_name} CASCADE`);
+      }
+    };
+
+    await dropTablesInSchema(schema);
+    await dropTablesInSchema('ponder_sync');
 
     await client.end();
 

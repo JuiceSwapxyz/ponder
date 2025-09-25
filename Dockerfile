@@ -14,11 +14,11 @@ COPY . .
 # Build the project
 RUN npm run build
 
-# Make startup script executable
-RUN chmod +x start-ponder.sh
-
 # Expose port
 EXPOSE 42069
 
-# Start with wrapper script
-CMD ["./start-ponder.sh"]
+# Run schema migration on container start
+ENTRYPOINT ["node", "schema-manager.js"]
+
+# Start ponder
+CMD ["npm", "start"]
