@@ -17,80 +17,17 @@ type Meta {
 }
 
 type Query {
-  campaignProgress(id: String!): campaignProgress
-  campaignProgresss(where: campaignProgressFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int): campaignProgressPage!
   taskCompletion(id: String!): taskCompletion
   taskCompletions(where: taskCompletionFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int): taskCompletionPage!
   swap(id: String!): swap
   swaps(where: swapFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int): swapPage!
+  pool(id: String!): pool
+  pools(where: poolFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int): poolPage!
+  position(id: String!): position
+  positions(where: positionFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int): positionPage!
   token(id: String!): token
   tokens(where: tokenFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int): tokenPage!
-  campaignStats(id: String!): campaignStats
-  campaignStatss(where: campaignStatsFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int): campaignStatsPage!
   _meta: Meta
-}
-
-type campaignProgress {
-  id: String!
-  walletAddress: String!
-  chainId: Int!
-  createdAt: BigInt!
-  updatedAt: BigInt!
-}
-
-type campaignProgressPage {
-  items: [campaignProgress!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-input campaignProgressFilter {
-  AND: [campaignProgressFilter]
-  OR: [campaignProgressFilter]
-  id: String
-  id_not: String
-  id_in: [String]
-  id_not_in: [String]
-  id_contains: String
-  id_not_contains: String
-  id_starts_with: String
-  id_ends_with: String
-  id_not_starts_with: String
-  id_not_ends_with: String
-  walletAddress: String
-  walletAddress_not: String
-  walletAddress_in: [String]
-  walletAddress_not_in: [String]
-  walletAddress_contains: String
-  walletAddress_not_contains: String
-  walletAddress_starts_with: String
-  walletAddress_ends_with: String
-  walletAddress_not_starts_with: String
-  walletAddress_not_ends_with: String
-  chainId: Int
-  chainId_not: Int
-  chainId_in: [Int]
-  chainId_not_in: [Int]
-  chainId_gt: Int
-  chainId_lt: Int
-  chainId_gte: Int
-  chainId_lte: Int
-  createdAt: BigInt
-  createdAt_not: BigInt
-  createdAt_in: [BigInt]
-  createdAt_not_in: [BigInt]
-  createdAt_gt: BigInt
-  createdAt_lt: BigInt
-  createdAt_gte: BigInt
-  createdAt_lte: BigInt
-  updatedAt: BigInt
-  updatedAt_not: BigInt
-  updatedAt_in: [BigInt]
-  updatedAt_not_in: [BigInt]
-  updatedAt_gt: BigInt
-  updatedAt_lt: BigInt
-  updatedAt_gte: BigInt
-  updatedAt_lte: BigInt
 }
 
 type taskCompletion {
@@ -368,15 +305,202 @@ input swapFilter {
   campaignTaskId_lte: Int
 }
 
+type pool {
+  id: String!
+  chainId: String!
+  address: String!
+  token0: String!
+  token1: String!
+  fee: Int!
+  tickSpacing: Int!
+  createdAt: BigInt!
+}
+
+type poolPage {
+  items: [pool!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input poolFilter {
+  AND: [poolFilter]
+  OR: [poolFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  chainId: String
+  chainId_not: String
+  chainId_in: [String]
+  chainId_not_in: [String]
+  chainId_contains: String
+  chainId_not_contains: String
+  chainId_starts_with: String
+  chainId_ends_with: String
+  chainId_not_starts_with: String
+  chainId_not_ends_with: String
+  address: String
+  address_not: String
+  address_in: [String]
+  address_not_in: [String]
+  address_contains: String
+  address_not_contains: String
+  address_starts_with: String
+  address_ends_with: String
+  address_not_starts_with: String
+  address_not_ends_with: String
+  token0: String
+  token0_not: String
+  token0_in: [String]
+  token0_not_in: [String]
+  token0_contains: String
+  token0_not_contains: String
+  token0_starts_with: String
+  token0_ends_with: String
+  token0_not_starts_with: String
+  token0_not_ends_with: String
+  token1: String
+  token1_not: String
+  token1_in: [String]
+  token1_not_in: [String]
+  token1_contains: String
+  token1_not_contains: String
+  token1_starts_with: String
+  token1_ends_with: String
+  token1_not_starts_with: String
+  token1_not_ends_with: String
+  fee: Int
+  fee_not: Int
+  fee_in: [Int]
+  fee_not_in: [Int]
+  fee_gt: Int
+  fee_lt: Int
+  fee_gte: Int
+  fee_lte: Int
+  tickSpacing: Int
+  tickSpacing_not: Int
+  tickSpacing_in: [Int]
+  tickSpacing_not_in: [Int]
+  tickSpacing_gt: Int
+  tickSpacing_lt: Int
+  tickSpacing_gte: Int
+  tickSpacing_lte: Int
+  createdAt: BigInt
+  createdAt_not: BigInt
+  createdAt_in: [BigInt]
+  createdAt_not_in: [BigInt]
+  createdAt_gt: BigInt
+  createdAt_lt: BigInt
+  createdAt_gte: BigInt
+  createdAt_lte: BigInt
+}
+
+type position {
+  id: String!
+  tokenId: String
+  owner: String
+  poolAddress: String
+  tickLower: Int
+  tickUpper: Int
+  amount0: BigInt
+  amount1: BigInt
+}
+
+type positionPage {
+  items: [position!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input positionFilter {
+  AND: [positionFilter]
+  OR: [positionFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  tokenId: String
+  tokenId_not: String
+  tokenId_in: [String]
+  tokenId_not_in: [String]
+  tokenId_contains: String
+  tokenId_not_contains: String
+  tokenId_starts_with: String
+  tokenId_ends_with: String
+  tokenId_not_starts_with: String
+  tokenId_not_ends_with: String
+  owner: String
+  owner_not: String
+  owner_in: [String]
+  owner_not_in: [String]
+  owner_contains: String
+  owner_not_contains: String
+  owner_starts_with: String
+  owner_ends_with: String
+  owner_not_starts_with: String
+  owner_not_ends_with: String
+  poolAddress: String
+  poolAddress_not: String
+  poolAddress_in: [String]
+  poolAddress_not_in: [String]
+  poolAddress_contains: String
+  poolAddress_not_contains: String
+  poolAddress_starts_with: String
+  poolAddress_ends_with: String
+  poolAddress_not_starts_with: String
+  poolAddress_not_ends_with: String
+  tickLower: Int
+  tickLower_not: Int
+  tickLower_in: [Int]
+  tickLower_not_in: [Int]
+  tickLower_gt: Int
+  tickLower_lt: Int
+  tickLower_gte: Int
+  tickLower_lte: Int
+  tickUpper: Int
+  tickUpper_not: Int
+  tickUpper_in: [Int]
+  tickUpper_not_in: [Int]
+  tickUpper_gt: Int
+  tickUpper_lt: Int
+  tickUpper_gte: Int
+  tickUpper_lte: Int
+  amount0: BigInt
+  amount0_not: BigInt
+  amount0_in: [BigInt]
+  amount0_not_in: [BigInt]
+  amount0_gt: BigInt
+  amount0_lt: BigInt
+  amount0_gte: BigInt
+  amount0_lte: BigInt
+  amount1: BigInt
+  amount1_not: BigInt
+  amount1_in: [BigInt]
+  amount1_not_in: [BigInt]
+  amount1_gt: BigInt
+  amount1_lt: BigInt
+  amount1_gte: BigInt
+  amount1_lte: BigInt
+}
+
 type token {
   id: String!
   address: String!
-  chainId: Int!
-  symbol: String
-  name: String
-  decimals: Int
-  isCampaignToken: Boolean!
-  campaignTaskId: Int
+  symbol: String!
+  decimals: Int!
+  name: String!
 }
 
 type tokenPage {
@@ -408,14 +532,6 @@ input tokenFilter {
   address_ends_with: String
   address_not_starts_with: String
   address_not_ends_with: String
-  chainId: Int
-  chainId_not: Int
-  chainId_in: [Int]
-  chainId_not_in: [Int]
-  chainId_gt: Int
-  chainId_lt: Int
-  chainId_gte: Int
-  chainId_lte: Int
   symbol: String
   symbol_not: String
   symbol_in: [String]
@@ -426,6 +542,14 @@ input tokenFilter {
   symbol_ends_with: String
   symbol_not_starts_with: String
   symbol_not_ends_with: String
+  decimals: Int
+  decimals_not: Int
+  decimals_in: [Int]
+  decimals_not_in: [Int]
+  decimals_gt: Int
+  decimals_lt: Int
+  decimals_gte: Int
+  decimals_lte: Int
   name: String
   name_not: String
   name_in: [String]
@@ -436,121 +560,4 @@ input tokenFilter {
   name_ends_with: String
   name_not_starts_with: String
   name_not_ends_with: String
-  decimals: Int
-  decimals_not: Int
-  decimals_in: [Int]
-  decimals_not_in: [Int]
-  decimals_gt: Int
-  decimals_lt: Int
-  decimals_gte: Int
-  decimals_lte: Int
-  isCampaignToken: Boolean
-  isCampaignToken_not: Boolean
-  isCampaignToken_in: [Boolean]
-  isCampaignToken_not_in: [Boolean]
-  campaignTaskId: Int
-  campaignTaskId_not: Int
-  campaignTaskId_in: [Int]
-  campaignTaskId_not_in: [Int]
-  campaignTaskId_gt: Int
-  campaignTaskId_lt: Int
-  campaignTaskId_gte: Int
-  campaignTaskId_lte: Int
-}
-
-type campaignStats {
-  id: String!
-  chainId: Int!
-  totalUsers: Int!
-  totalSwaps: Int!
-  totalVolume: BigInt!
-  task1Completions: Int!
-  task2Completions: Int!
-  task3Completions: Int!
-  lastUpdated: BigInt!
-}
-
-type campaignStatsPage {
-  items: [campaignStats!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-input campaignStatsFilter {
-  AND: [campaignStatsFilter]
-  OR: [campaignStatsFilter]
-  id: String
-  id_not: String
-  id_in: [String]
-  id_not_in: [String]
-  id_contains: String
-  id_not_contains: String
-  id_starts_with: String
-  id_ends_with: String
-  id_not_starts_with: String
-  id_not_ends_with: String
-  chainId: Int
-  chainId_not: Int
-  chainId_in: [Int]
-  chainId_not_in: [Int]
-  chainId_gt: Int
-  chainId_lt: Int
-  chainId_gte: Int
-  chainId_lte: Int
-  totalUsers: Int
-  totalUsers_not: Int
-  totalUsers_in: [Int]
-  totalUsers_not_in: [Int]
-  totalUsers_gt: Int
-  totalUsers_lt: Int
-  totalUsers_gte: Int
-  totalUsers_lte: Int
-  totalSwaps: Int
-  totalSwaps_not: Int
-  totalSwaps_in: [Int]
-  totalSwaps_not_in: [Int]
-  totalSwaps_gt: Int
-  totalSwaps_lt: Int
-  totalSwaps_gte: Int
-  totalSwaps_lte: Int
-  totalVolume: BigInt
-  totalVolume_not: BigInt
-  totalVolume_in: [BigInt]
-  totalVolume_not_in: [BigInt]
-  totalVolume_gt: BigInt
-  totalVolume_lt: BigInt
-  totalVolume_gte: BigInt
-  totalVolume_lte: BigInt
-  task1Completions: Int
-  task1Completions_not: Int
-  task1Completions_in: [Int]
-  task1Completions_not_in: [Int]
-  task1Completions_gt: Int
-  task1Completions_lt: Int
-  task1Completions_gte: Int
-  task1Completions_lte: Int
-  task2Completions: Int
-  task2Completions_not: Int
-  task2Completions_in: [Int]
-  task2Completions_not_in: [Int]
-  task2Completions_gt: Int
-  task2Completions_lt: Int
-  task2Completions_gte: Int
-  task2Completions_lte: Int
-  task3Completions: Int
-  task3Completions_not: Int
-  task3Completions_in: [Int]
-  task3Completions_not_in: [Int]
-  task3Completions_gt: Int
-  task3Completions_lt: Int
-  task3Completions_gte: Int
-  task3Completions_lte: Int
-  lastUpdated: BigInt
-  lastUpdated_not: BigInt
-  lastUpdated_in: [BigInt]
-  lastUpdated_not_in: [BigInt]
-  lastUpdated_gt: BigInt
-  lastUpdated_lt: BigInt
-  lastUpdated_gte: BigInt
-  lastUpdated_lte: BigInt
 }

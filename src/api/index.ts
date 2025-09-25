@@ -3,8 +3,17 @@ import { cors } from "hono/cors";
 // @ts-ignore
 import { db } from "ponder:api";
 // @ts-ignore
+import schema from "ponder:schema";
+// @ts-ignore
 import { taskCompletion } from "ponder:schema";
 import { eq, and } from "drizzle-orm";
+
+import { graphql } from "ponder"; // @ts-ignore
+
+// Import controllers
+import positions from "./controllers/positions";
+import pools from "./controllers/pools";
+
 
 const app = new Hono();
 
@@ -26,6 +35,12 @@ app.use('/*', cors({
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.use("/graphql", graphql({ db, schema })); 
+
+// Mount API controllers
+app.route("/positions", positions);
+app.route("/pools", pools);
 
 // Campaign Progress API Endpoint (GET with query params)
 app.get("/campaign/progress", async (c) => {

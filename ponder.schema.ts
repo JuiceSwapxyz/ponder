@@ -1,5 +1,34 @@
 import { onchainTable } from "ponder";
 
+// TypeScript types for JSON structures
+export interface Token {
+  chainId: number;
+  address: string;
+  symbol: string;
+  decimals: number;
+  name: string;
+}
+
+export interface V3Position {
+  tokenId: string;
+  tickLower: string;
+  tickUpper: string;
+  liquidity: string;
+  token0: Token;
+  token1: Token;
+  feeTier: string;
+  currentTick: string;
+  currentPrice: string;
+  tickSpacing: string;
+  token0UncollectedFees: string;
+  token1UncollectedFees: string;
+  amount0: string;
+  amount1: string;
+  poolId: string;
+  totalLiquidityUsd: string;
+  currentLiquidity: string;
+}
+
 export const taskCompletion = onchainTable("task_completion", (t) => ({
   id: t.text().primaryKey(), // Format: {chainId}:{walletAddress}:{taskId}
   walletAddress: t.hex().notNull(),
@@ -29,4 +58,57 @@ export const swap = onchainTable("swap", (t) => ({
   methodSignature: t.text().notNull(),
   isCampaignRelevant: t.boolean().notNull(),
   campaignTaskId: t.integer(),
+}));
+/*
+Example "Position", we will use it to build a new schema for positions
+{
+  "chainId": 11155111,
+  "protocolVersion": "PROTOCOL_VERSION_V3",
+  "v3Position": {
+      "tokenId": "210447",
+      "liquidity": "37945455597966861",
+      "feeTier": "3000",
+      "currentTick": "-115136",
+      "currentPrice": "250529060232794967902094762",
+      "tickSpacing": "60",
+      "token0UncollectedFees": "0",
+      "token1UncollectedFees": "0",
+      "amount0": "11999999999999921393",
+      "amount1": "119988133378106",
+      "totalLiquidityUsd": "5.265636176503667857671428106519472",
+      "currentLiquidity": "104350002894409105"
+  },
+  "status": "POSITION_STATUS_IN_RANGE",
+  "timestamp": 1758667656
+}
+*/
+
+export const pool = onchainTable("pool", (t) => ({
+  id: t.text().primaryKey(),
+  chainId: t.numeric().notNull(),
+  address: t.text().notNull(),
+  token0: t.text().notNull(),
+  token1: t.text().notNull(),
+  fee: t.integer().notNull(),
+  tickSpacing: t.integer().notNull(),
+  createdAt: t.bigint().notNull(),
+}));
+
+export const position = onchainTable("position", (t) => ({
+  id: t.text().primaryKey(),
+  tokenId: t.text(),
+  owner: t.text(),
+  poolAddress: t.text(),
+  tickLower: t.integer(),
+  tickUpper: t.integer(),
+  amount0: t.bigint(),
+  amount1: t.bigint(),
+}));
+
+export const token = onchainTable("token", (t) => ({
+  id: t.text().primaryKey(),
+  address: t.text().notNull(),
+  symbol: t.text().notNull(),
+  decimals: t.integer().notNull(),
+  name: t.text().notNull(),
 }));
