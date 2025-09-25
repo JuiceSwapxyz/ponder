@@ -384,7 +384,7 @@ app.get("/campaign/stats", async (c: Context) => {
 app.get("/api/info", async (c: Context) => {
   return c.json({
     name: "JuiceSwap Ponder",
-    version: "1.0.1",
+    version: "1.0.2",
     chain: "citreaTestnet",
     contracts: {
       CBTCNUSDPool: "0x6006797369E2A595D31Df4ab3691044038AAa7FE",
