@@ -1,13 +1,23 @@
-name: JuiceSwap Ponder PROD CI/CD
+name: JuiceSwap Ponder PRD CI/CD
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+      inputs:
+      reset_schema:
+        description: 'Create new schema version (resets database)'
+        required: false
+        default: false
+        type: boolean
+
 
 env:
-  DOCKER_TAGS: dfxswiss/juiceswap-ponder:latest
   NODE_VERSION: '20'
+  DOCKER_TAGS: dfxswiss/juiceswap-ponder:latest
+  DEPLOY_INFO: ${{ github.ref_name }}-${{ github.sha }}
+  AZURE_RESOURCE_GROUP: rg-dfx-api-prd
+  AZURE_CONTAINER_APP: ca-dfx-jsp-prd
 
 jobs:
   test:
@@ -63,12 +73,23 @@ jobs:
             NODE_ENV=production
 
   deploy:
-    name: Deploy to Production
+    name: Deploy to PRD
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
     steps:
-      - name: Deploy notification
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.DFX_PRD_CREDENTIALS }}
+
+      - name: Update Azure Container App
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az containerapp update --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} --image ${{ env.DOCKER_TAGS }} --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
+
+      - name: Logout from Azure
         run: |
-          echo "🚀 Deployment to production environment would happen here"
-          # Add your deployment steps here (e.g., Kubernetes, AWS ECS, etc.)
+          az logout
+        if: always()

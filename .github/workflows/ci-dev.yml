@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       reset_schema:
-        description: 'Reset database schema (creates new schema version)'
+        description: 'Create new schema version (resets database)'
         required: false
         default: false
         type: boolean
