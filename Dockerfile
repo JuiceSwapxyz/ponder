@@ -14,8 +14,11 @@ COPY . .
 # Build the project
 RUN npm run build
 
+# Make startup script executable
+RUN chmod +x start-ponder.sh
+
 # Expose port
 EXPOSE 42069
 
-# Start Ponder (includes built-in API)
-CMD ["npm", "start"]
+# Start with wrapper script
+CMD ["./start-ponder.sh"]

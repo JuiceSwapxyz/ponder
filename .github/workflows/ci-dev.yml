@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [develop]
   workflow_dispatch:
+    inputs:
+      reset_schema:
+        description: 'Reset database schema (creates new schema version)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   NODE_VERSION: '20'
@@ -82,7 +88,7 @@ jobs:
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            az containerapp update --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} --image ${{ env.DOCKER_TAGS }} --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}
+            az containerapp update --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} --image ${{ env.DOCKER_TAGS }} --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
 
       - name: Logout from Azure
         run: |
