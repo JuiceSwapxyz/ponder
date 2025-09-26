@@ -50,8 +50,6 @@ app.get("/campaign/progress", async (c) => {
     const walletAddress = c.req.query('walletAddress');
     const chainId = c.req.query('chainId');
 
-    // Log the API request
-    console.log(`📊 Campaign API (GET): wallet=${walletAddress}, chain=${chainId}`);
 
     // Validate input
     if (!walletAddress || !chainId) {
@@ -136,8 +134,6 @@ app.get("/campaign/progress", async (c) => {
       claimTxHash: null
     };
 
-    // Log successful response
-    console.log(`✅ Campaign response: ${completedTasks}/${totalTasks} tasks (${progress.toFixed(0)}%) for ${String(walletAddress).slice(0,6)}...${String(walletAddress).slice(-4)}`);
 
     return c.json(response);
 
@@ -153,8 +149,6 @@ app.post("/campaign/progress", async (c) => {
     const body = await c.req.json();
     const { walletAddress, chainId } = body;
 
-    // Log the API request
-    console.log(`📊 Campaign API (POST): wallet=${walletAddress}, chain=${chainId}`);
 
     // Validate input
     if (!walletAddress || !chainId) {
@@ -239,8 +233,6 @@ app.post("/campaign/progress", async (c) => {
       claimTxHash: null
     };
 
-    // Log successful response
-    console.log(`✅ Campaign response: ${completedTasks}/${totalTasks} tasks (${progress.toFixed(0)}%) for ${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}`);
 
     return c.json(response);
 
@@ -267,7 +259,6 @@ app.get("/campaign/addresses", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
 
-    console.log(`📊 Getting all registered addresses for chain=${chainId}`);
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -323,7 +314,6 @@ app.get("/campaign/addresses", async (c: Context) => {
     // Return in database order (no sorting)
     const response = addresses;
 
-    console.log(`✅ Found ${addresses.length} registered addresses`);
 
     return c.json(response);
 
@@ -338,7 +328,6 @@ app.get("/campaign/stats", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
 
-    console.log(`📊 Getting campaign statistics for chain=${chainId}`);
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -372,7 +361,6 @@ app.get("/campaign/stats", async (c: Context) => {
       completedAllTasks: addressesWithAllTasks
     };
 
-    console.log(`✅ Campaign stats: ${response.totalParticipants} participants, ${response.completedAllTasks} completed`);
 
     return c.json(response);
 
