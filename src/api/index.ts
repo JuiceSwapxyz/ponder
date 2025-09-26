@@ -448,7 +448,7 @@ app.get("/api/sync-status", async (c: Context) => {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { result?: string };
         if (data.result) {
           // Convert hex to decimal
           currentChainBlock = parseInt(data.result, 16);
