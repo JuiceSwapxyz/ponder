@@ -143,7 +143,7 @@ app.get("/campaign/progress", async (c) => {
   }
 });
 
-// POST version for compatibility with requirements
+// POST  for compatibility with requirements
 app.post("/campaign/progress", async (c) => {
   try {
     const body = await c.req.json();
@@ -249,7 +249,7 @@ app.get("/campaign/health", async (c) => {
     timestamp: new Date().toISOString(),
     chains: ["citreaTestnet"],
     features: ["campaign-progress"],
-    version: "1.0.0"
+    version: "1.0.7"
   });
 });
 
@@ -374,7 +374,7 @@ app.get("/campaign/stats", async (c: Context) => {
 app.get("/api/info", async (c: Context) => {
   return c.json({
     name: "JuiceSwap Ponder",
-    version: "1.0.6",
+    version: "1.0.7",
     chain: "citreaTestnet",
     contracts: {
       CBTCNUSDPool: "0x6006797369E2A595D31Df4ab3691044038AAa7FE",
