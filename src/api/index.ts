@@ -370,6 +370,155 @@ app.get("/campaign/stats", async (c: Context) => {
   }
 });
 
+// Campaign daily growth endpoint for charts
+app.get("/campaign/daily-growth", async (c: Context) => {
+  try {
+    const chainId = c.req.query('chainId') || '5115';
+    const days = parseInt(c.req.query('days') || '30'); // Last 30 days by default
+
+    if (Number(chainId) !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    // Get all task completions
+    const allCompletions = await db
+      .select()
+      .from(taskCompletion)
+      .where(eq(taskCompletion.chainId, Number(chainId)))
+      .orderBy(taskCompletion.completedAt);
+
+    // Group by day
+    const dailyData = new Map<string, { date: string; newUsers: Set<string>; totalUsers: Set<string> }>();
+    const allUsers = new Set<string>();
+
+    for (const completion of allCompletions) {
+      const timestamp = Number(completion.completedAt);
+      const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+
+      if (!dailyData.has(date)) {
+        dailyData.set(date, {
+          date,
+          newUsers: new Set(),
+          totalUsers: new Set()
+        });
+      }
+
+      const dayData = dailyData.get(date)!;
+      const userKey = completion.walletAddress.toLowerCase();
+
+      // Check if this is user's first activity
+      if (!allUsers.has(userKey)) {
+        dayData.newUsers.add(userKey);
+        allUsers.add(userKey);
+      }
+    }
+
+    // Convert to array and calculate cumulative
+    const result = [];
+    let cumulative = 0;
+
+    for (const [date, data] of Array.from(dailyData.entries()).sort()) {
+      const newUsers = data.newUsers.size;
+      cumulative += newUsers;
+
+      result.push({
+        date,
+        newUsers,
+        cumulative,
+        uniqueActiveUsers: data.newUsers.size
+      });
+    }
+
+    // Limit to requested days
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const filtered = result.filter(item => new Date(item.date) >= cutoffDate);
+
+    return c.json({
+      chainId: Number(chainId),
+      period: `${days} days`,
+      data: filtered,
+      summary: {
+        totalDays: filtered.length,
+        totalNewUsers: cumulative,
+        averageDaily: Math.round(cumulative / filtered.length) || 0
+      }
+    });
+
+  } catch (error) {
+    console.error("Campaign daily growth API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// Campaign hourly activity endpoint for real-time monitoring
+app.get("/campaign/hourly-activity", async (c: Context) => {
+  try {
+    const chainId = c.req.query('chainId') || '5115';
+    const hours = parseInt(c.req.query('hours') || '24'); // Last 24 hours by default
+
+    if (Number(chainId) !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    const cutoffTime = Math.floor(Date.now() / 1000) - (hours * 3600);
+
+    // Get recent completions
+    const recentCompletions = await db
+      .select()
+      .from(taskCompletion)
+      .where(and(
+        eq(taskCompletion.chainId, Number(chainId)),
+        taskCompletion.completedAt > cutoffTime
+      ))
+      .orderBy(taskCompletion.completedAt);
+
+    // Group by hour
+    const hourlyData = new Map<string, { hour: string; activities: number; uniqueUsers: Set<string> }>();
+
+    for (const completion of recentCompletions) {
+      const timestamp = Number(completion.completedAt);
+      const hour = new Date(timestamp * 1000).toISOString().slice(0, 13) + ':00:00Z';
+
+      if (!hourlyData.has(hour)) {
+        hourlyData.set(hour, {
+          hour,
+          activities: 0,
+          uniqueUsers: new Set()
+        });
+      }
+
+      const hourData = hourlyData.get(hour)!;
+      hourData.activities++;
+      hourData.uniqueUsers.add(completion.walletAddress.toLowerCase());
+    }
+
+    // Convert to array
+    const result = Array.from(hourlyData.values())
+      .map(data => ({
+        hour: data.hour,
+        activities: data.activities,
+        uniqueUsers: data.uniqueUsers.size
+      }))
+      .sort((a, b) => a.hour.localeCompare(b.hour));
+
+    return c.json({
+      chainId: Number(chainId),
+      period: `${hours} hours`,
+      data: result,
+      summary: {
+        totalHours: result.length,
+        totalActivities: result.reduce((sum, h) => sum + h.activities, 0),
+        peakHour: result.reduce((max, h) => h.activities > max.activities ? h : max, result[0])?.hour || null
+      }
+    });
+
+  } catch (error) {
+    console.error("Campaign hourly activity API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 // Info endpoint
 app.get("/api/info", async (c: Context) => {
   return c.json({
