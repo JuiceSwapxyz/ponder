@@ -18,8 +18,14 @@ import tokens from "./controllers/tokens";
 // Import Swagger
 import { swaggerUI } from "@hono/swagger-ui";
 import { apiDocumentation } from "./swagger";
+import { customSwaggerUIHtml } from "./swagger-ui";
 
 const app = new Hono();
+
+// Redirect root to Swagger documentation
+app.get('/', (c) => {
+  return c.redirect('/swagger', 301);
+});
 
 // Enable CORS for all juiceswap.com domains
 app.use('/*', cors({
@@ -485,8 +491,10 @@ app.get("/api/sync-status", async (c: Context) => {
   }
 });
 
-// Swagger UI endpoint
-app.get('/swagger', swaggerUI({ url: '/api-docs' }));
+// Swagger UI endpoint with custom theme
+app.get('/swagger', (c) => {
+  return c.html(customSwaggerUIHtml('/api-docs'));
+});
 
 // OpenAPI JSON endpoint
 app.get('/api-docs', (c) => {

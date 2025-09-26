@@ -8,7 +8,16 @@ export const swaggerConfig = {
     description: "API for JuiceSwap DEX analytics and campaign tracking on Citrea Testnet",
     contact: {
       name: "JuiceSwap Team",
-      url: "https://juiceswap.com"
+      url: "https://juiceswap.com",
+      email: "dev@juiceswap.com"
+    },
+    license: {
+      name: "MIT",
+      url: "https://opensource.org/licenses/MIT"
+    },
+    "x-logo": {
+      url: "https://juiceswap.com/logo.png",
+      altText: "JuiceSwap Logo"
     }
   },
   servers: [
@@ -55,9 +64,76 @@ export function getSwaggerUI() {
 
 export const apiDocumentation = {
   openapi: "3.0.0",
-  info: swaggerConfig.info,
+  info: {
+    ...swaggerConfig.info,
+    "x-build": {
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development"
+    }
+  },
   servers: swaggerConfig.servers,
   tags: swaggerConfig.tags,
+  components: {
+    securitySchemes: {
+      BearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Enter your Bearer token in the format: Bearer <token>"
+      }
+    },
+    schemas: {
+      Error: {
+        type: "object",
+        properties: {
+          error: {
+            type: "string",
+            description: "Error message"
+          },
+          statusCode: {
+            type: "integer",
+            description: "HTTP status code"
+          },
+          timestamp: {
+            type: "string",
+            format: "date-time",
+            description: "Timestamp of the error"
+          }
+        }
+      },
+      Task: {
+        type: "object",
+        properties: {
+          id: { type: "number", example: 1 },
+          name: { type: "string", example: "Swap cBTC to NUSD" },
+          description: { type: "string" },
+          completed: { type: "boolean" },
+          completedAt: { type: "string", format: "date-time", nullable: true },
+          txHash: { type: "string", nullable: true }
+        }
+      },
+      CampaignProgress: {
+        type: "object",
+        properties: {
+          walletAddress: { type: "string", example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb" },
+          chainId: { type: "number", example: 5115 },
+          tasks: {
+            type: "array",
+            items: { "$ref": "#/components/schemas/Task" }
+          },
+          totalTasks: { type: "number", example: 3 },
+          completedTasks: { type: "number", example: 1 },
+          progress: { type: "number", example: 33.33 },
+          nftClaimed: { type: "boolean" },
+          claimTxHash: { type: "string", nullable: true }
+        }
+      }
+    }
+  },
+  externalDocs: {
+    description: "GitHub Repository",
+    url: "https://github.com/JuiceSwapxyz/ponder"
+  },
   paths: {
     "/campaign/progress": {
       get: {
