@@ -83,28 +83,32 @@ jobs:
         with:
           creds: ${{ secrets.DFX_PRD_CREDENTIALS }}
 
-      - name: Stop existing container before deployment
+      - name: Scale down container to prevent conflicts
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            echo "Stopping existing container app to prevent conflicts..."
-            az containerapp stop --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} || echo "Container was not running"
-            echo "Waiting 10 seconds for complete shutdown..."
-            sleep 10
+            echo "Scaling down container app to 0 replicas..."
+            az containerapp update \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name ${{ env.AZURE_CONTAINER_APP }} \
+              --min-replicas 0 \
+              --max-replicas 0 || echo "Failed to scale down, continuing anyway"
+            echo "Waiting 15 seconds for complete shutdown..."
+            sleep 15
 
       - name: Update Azure Container App with new image
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            echo "Updating container app with new image..."
-            az containerapp update --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} --image ${{ env.DOCKER_TAGS }} --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
-
-      - name: Start container app
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            echo "Starting container app..."
-            az containerapp start --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }}
+            echo "Updating container app with new image and scaling back up..."
+            az containerapp update \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name ${{ env.AZURE_CONTAINER_APP }} \
+              --image ${{ env.DOCKER_TAGS }} \
+              --min-replicas 1 \
+              --max-replicas 1 \
+              --revision-mode single \
+              --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
             echo "Deployment completed successfully!"
 
       - name: Logout from Azure
