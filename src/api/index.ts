@@ -6,7 +6,7 @@ import { db } from "ponder:api";
 import schema from "ponder:schema";
 // @ts-ignore
 import { taskCompletion, swap, pool, position } from "ponder:schema";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, gt } from "drizzle-orm";
 
 import { graphql } from "ponder"; // @ts-ignore
 
@@ -469,7 +469,7 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
       .from(taskCompletion)
       .where(and(
         eq(taskCompletion.chainId, Number(chainId)),
-        taskCompletion.completedAt > cutoffTime
+        gt(taskCompletion.completedAt, cutoffTime)
       ))
       .orderBy(taskCompletion.completedAt);
 
