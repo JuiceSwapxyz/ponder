@@ -15,6 +15,9 @@ import positions from "./controllers/positions";
 import pools from "./controllers/pools";
 import tokens from "./controllers/tokens";
 
+// Import Swagger
+import { swaggerUI } from "@hono/swagger-ui";
+import { apiDocumentation } from "./swagger";
 
 const app = new Hono();
 
@@ -480,6 +483,14 @@ app.get("/api/sync-status", async (c: Context) => {
       timestamp: new Date().toISOString()
     }, 500);
   }
+});
+
+// Swagger UI endpoint
+app.get('/swagger', swaggerUI({ url: '/api-docs' }));
+
+// OpenAPI JSON endpoint
+app.get('/api-docs', (c) => {
+  return c.json(apiDocumentation);
 });
 
 export default app;
