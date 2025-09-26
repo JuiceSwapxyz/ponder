@@ -143,7 +143,7 @@ app.get("/campaign/progress", async (c) => {
   }
 });
 
-// POST  for compatibility with requirements
+// POST version for compatibility with requirements
 app.post("/campaign/progress", async (c) => {
   try {
     const body = await c.req.json();
