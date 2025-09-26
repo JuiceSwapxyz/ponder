@@ -84,11 +84,29 @@ jobs:
         with:
           creds: ${{ secrets.DFX_DEV_CREDENTIALS }}
 
-      - name: Update Azure Container App
+      - name: Stop existing container before deployment
         uses: azure/CLI@v2
         with:
           inlineScript: |
+            echo "Stopping existing container app to prevent conflicts..."
+            az containerapp stop --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} || echo "Container was not running"
+            echo "Waiting 10 seconds for complete shutdown..."
+            sleep 10
+
+      - name: Update Azure Container App with new image
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            echo "Updating container app with new image..."
             az containerapp update --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }} --image ${{ env.DOCKER_TAGS }} --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
+
+      - name: Start container app
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            echo "Starting container app..."
+            az containerapp start --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_CONTAINER_APP }}
+            echo "Deployment completed successfully!"
 
       - name: Logout from Azure
         run: |
