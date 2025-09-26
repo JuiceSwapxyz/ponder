@@ -108,7 +108,7 @@ jobs:
               --image ${{ env.DOCKER_TAGS }} \
               --min-replicas 1 \
               --max-replicas 1 \
-              --revision-mode single \
+              --revisions-mode single \
               --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
             echo "Deployment completed successfully!"
 
