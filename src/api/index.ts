@@ -13,6 +13,7 @@ import { graphql } from "ponder"; // @ts-ignore
 // Import controllers
 import positions from "./controllers/positions";
 import pools from "./controllers/pools";
+import tokens from "./controllers/tokens";
 
 
 const app = new Hono();
@@ -41,6 +42,7 @@ app.use("/graphql", graphql({ db, schema }));
 // Mount API controllers
 app.route("/positions", positions);
 app.route("/pools", pools);
+app.route("/tokens", tokens);
 
 // Campaign Progress API Endpoint (GET with query params)
 app.get("/campaign/progress", async (c) => {
@@ -384,7 +386,7 @@ app.get("/campaign/stats", async (c: Context) => {
 app.get("/api/info", async (c: Context) => {
   return c.json({
     name: "JuiceSwap Ponder",
-    version: "1.0.2",
+    version: "1.0.5",
     chain: "citreaTestnet",
     contracts: {
       CBTCNUSDPool: "0x6006797369E2A595D31Df4ab3691044038AAa7FE",
