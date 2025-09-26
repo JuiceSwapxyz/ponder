@@ -1,4 +1,4 @@
-import { createConfig } from "ponder";
+import { createConfig, rateLimit } from "ponder";
 import { UniswapV3PoolAbi } from "./abis/UniswapV3Pool";
 import { citreaTransport } from "./citrea-transport-fix";
 import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager";
@@ -9,7 +9,9 @@ export default createConfig({
     // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: citreaTransport(process.env.CITREA_RPC_URL ?? "https://rpc.testnet.citrea.xyz"),
+      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "https://rpc.testnet.citrea.xyz"), {
+        requestsPerSecond: 30
+      }),
     },
   },
   contracts: {

@@ -5,8 +5,8 @@ import { db } from "ponder:api";
 // @ts-ignore
 import schema from "ponder:schema";
 // @ts-ignore
-import { taskCompletion } from "ponder:schema";
-import { eq, and } from "drizzle-orm";
+import { taskCompletion, swap, pool, position } from "ponder:schema";
+import { eq, and, desc, count } from "drizzle-orm";
 
 import { graphql } from "ponder"; // @ts-ignore
 
@@ -50,8 +50,6 @@ app.get("/campaign/progress", async (c) => {
     const walletAddress = c.req.query('walletAddress');
     const chainId = c.req.query('chainId');
 
-    // Log the API request
-    console.log(`📊 Campaign API (GET): wallet=${walletAddress}, chain=${chainId}`);
 
     // Validate input
     if (!walletAddress || !chainId) {
@@ -136,8 +134,6 @@ app.get("/campaign/progress", async (c) => {
       claimTxHash: null
     };
 
-    // Log successful response
-    console.log(`✅ Campaign response: ${completedTasks}/${totalTasks} tasks (${progress.toFixed(0)}%) for ${String(walletAddress).slice(0,6)}...${String(walletAddress).slice(-4)}`);
 
     return c.json(response);
 
@@ -153,8 +149,6 @@ app.post("/campaign/progress", async (c) => {
     const body = await c.req.json();
     const { walletAddress, chainId } = body;
 
-    // Log the API request
-    console.log(`📊 Campaign API (POST): wallet=${walletAddress}, chain=${chainId}`);
 
     // Validate input
     if (!walletAddress || !chainId) {
@@ -239,8 +233,6 @@ app.post("/campaign/progress", async (c) => {
       claimTxHash: null
     };
 
-    // Log successful response
-    console.log(`✅ Campaign response: ${completedTasks}/${totalTasks} tasks (${progress.toFixed(0)}%) for ${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}`);
 
     return c.json(response);
 
@@ -267,7 +259,6 @@ app.get("/campaign/addresses", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
 
-    console.log(`📊 Getting all registered addresses for chain=${chainId}`);
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -323,7 +314,6 @@ app.get("/campaign/addresses", async (c: Context) => {
     // Return in database order (no sorting)
     const response = addresses;
 
-    console.log(`✅ Found ${addresses.length} registered addresses`);
 
     return c.json(response);
 
@@ -338,7 +328,6 @@ app.get("/campaign/stats", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
 
-    console.log(`📊 Getting campaign statistics for chain=${chainId}`);
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -372,7 +361,6 @@ app.get("/campaign/stats", async (c: Context) => {
       completedAllTasks: addressesWithAllTasks
     };
 
-    console.log(`✅ Campaign stats: ${response.totalParticipants} participants, ${response.completedAllTasks} completed`);
 
     return c.json(response);
 
@@ -394,6 +382,104 @@ app.get("/api/info", async (c: Context) => {
       CBTCUSDCPool: "0xD8C7604176475eB8D350bC1EE452dA4442637C09"
     }
   });
+});
+
+// Sync status endpoint
+app.get("/api/sync-status", async (c: Context) => {
+  try {
+    let latestIndexedBlock = 0;
+    let currentChainBlock = 0;
+    let swapCount = 0;
+    let poolCount = 0;
+    let positionCount = 0;
+
+    // Get latest indexed block and counts from database
+    try {
+      // Get latest swap block number
+      const latestSwap = await db
+        .select()
+        .from(swap)
+        .orderBy(desc(swap.blockNumber))
+        .limit(1);
+
+      if (latestSwap.length > 0) {
+        latestIndexedBlock = Number(latestSwap[0].blockNumber);
+      }
+
+      // Get counts
+      const swapCountResult = await db.select({ count: count() }).from(swap);
+      swapCount = swapCountResult[0]?.count || 0;
+
+      const poolCountResult = await db.select({ count: count() }).from(pool);
+      poolCount = poolCountResult[0]?.count || 0;
+
+      const positionCountResult = await db.select({ count: count() }).from(position);
+      positionCount = positionCountResult[0]?.count || 0;
+    } catch (dbError) {
+      console.warn("Failed to query database:", dbError);
+    }
+
+    // Get current block number from Citrea RPC
+    try {
+      const rpcUrl = process.env.CITREA_RPC_URL || "https://rpc.testnet.citrea.xyz";
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "eth_blockNumber",
+          params: [],
+          id: 1
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json() as { result?: string };
+        if (data.result) {
+          // Convert hex to decimal
+          currentChainBlock = parseInt(data.result, 16);
+        }
+      }
+    } catch (rpcError) {
+      console.warn("Failed to fetch current block from RPC:", rpcError);
+      // Fallback to estimate if RPC fails
+      currentChainBlock = Math.max(latestIndexedBlock + 1000, 1500000);
+    }
+
+    // Calculate precise sync percentage
+    const syncPercentage = (latestIndexedBlock > 0 && currentChainBlock > 0)
+      ? Math.min(100, (latestIndexedBlock / currentChainBlock) * 100)
+      : 0;
+
+    const blocksBehind = Math.max(0, currentChainBlock - latestIndexedBlock);
+    const isSynced = blocksBehind <= 10; // Consider synced if within 10 blocks
+
+    return c.json({
+      status: "OK",
+      timestamp: new Date().toISOString(),
+      sync: {
+        latestIndexedBlock,
+        currentChainBlock,
+        blocksBehind,
+        syncPercentage: Number(syncPercentage.toFixed(2)),
+        status: isSynced ? "synced" : "syncing"
+      },
+      stats: {
+        swaps: swapCount,
+        pools: poolCount,
+        positions: positionCount
+      }
+    });
+  } catch (error) {
+    console.error("Sync status error:", error);
+    return c.json({
+      status: "ERROR",
+      error: "Failed to get sync status",
+      timestamp: new Date().toISOString()
+    }, 500);
+  }
 });
 
 export default app;

@@ -111,8 +111,6 @@ async function processCampaignSwap(event: any, context: any, poolAddress: string
       blockNumber: safeBigInt(blockNumber),
     }).onConflictDoNothing();
 
-    console.log(`✅ ${symbol} Campaign: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)} completed Task ${taskId}`);
-
   } catch (error) {
     console.error(`❌ Error processing ${symbol} campaign:`, error);
     // Continue execution - don't throw to prevent system crash
@@ -124,8 +122,6 @@ ponder.on("CBTCNUSDPool_CitreaTestnet:Swap", async ({ event, context }: { event:
   const poolAddress = "0x6006797369E2A595D31Df4ab3691044038AAa7FE";
   const poolInfo = CAMPAIGN_POOLS[poolAddress];
 
-  console.log(`🔵 NUSD Event: ${event.transaction.hash}`);
-
   if (poolInfo) {
     await processCampaignSwap(event, context, poolAddress, poolInfo.taskId, poolInfo.symbol);
   }
@@ -136,8 +132,6 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }: { event:
   const poolAddress = "0xA69De906B9A830Deb64edB97B2eb0848139306d2";
   const poolInfo = CAMPAIGN_POOLS[poolAddress];
 
-  console.log(`🟡 cUSD Event: ${event.transaction.hash}`);
-
   if (poolInfo) {
     await processCampaignSwap(event, context, poolAddress, poolInfo.taskId, poolInfo.symbol);
   }
@@ -147,8 +141,6 @@ ponder.on("CBTCcUSDPool_CitreaTestnet:Swap", async ({ event, context }: { event:
 ponder.on("CBTCUSDCPool_CitreaTestnet:Swap", async ({ event, context }: { event: any; context: any }) => {
   const poolAddress = "0xD8C7604176475eB8D350bC1EE452dA4442637C09";
   const poolInfo = CAMPAIGN_POOLS[poolAddress];
-
-  console.log(`🟢 USDC Event: ${event.transaction.hash}`);
 
   if (poolInfo) {
     await processCampaignSwap(event, context, poolAddress, poolInfo.taskId, poolInfo.symbol);
