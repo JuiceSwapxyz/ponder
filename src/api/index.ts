@@ -393,6 +393,9 @@ app.get("/api/sync-status", async (c: Context) => {
     let poolCount = 0;
     let positionCount = 0;
 
+    // Define the start block from ponder.config.ts
+    const START_BLOCK = 15455001;
+
     // Get latest indexed block and counts from database
     try {
       // Get latest swap block number
@@ -448,9 +451,11 @@ app.get("/api/sync-status", async (c: Context) => {
       currentChainBlock = Math.max(latestIndexedBlock + 1000, 1500000);
     }
 
-    // Calculate precise sync percentage
-    const syncPercentage = (latestIndexedBlock > 0 && currentChainBlock > 0)
-      ? Math.min(100, (latestIndexedBlock / currentChainBlock) * 100)
+    // Calculate precise sync percentage based on actual progress from start block
+    const blocksProcessed = Math.max(0, latestIndexedBlock - START_BLOCK);
+    const totalBlocksToProcess = Math.max(1, currentChainBlock - START_BLOCK);
+    const syncPercentage = (latestIndexedBlock > 0 && currentChainBlock > START_BLOCK)
+      ? Math.min(100, (blocksProcessed / totalBlocksToProcess) * 100)
       : 0;
 
     const blocksBehind = Math.max(0, currentChainBlock - latestIndexedBlock);
