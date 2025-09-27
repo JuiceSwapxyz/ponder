@@ -468,7 +468,7 @@ app.get("/api/sync-status", async (c: Context) => {
         latestIndexedBlock,
         currentChainBlock,
         blocksBehind,
-        syncPercentage: Number(syncPercentage.toFixed(2)),
+        syncPercentage: `${syncPercentage.toFixed(2)}%`,
         status: isSynced ? "synced" : "syncing"
       },
       stats: {
