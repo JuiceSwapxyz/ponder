@@ -83,24 +83,21 @@ jobs:
         with:
           creds: ${{ secrets.DFX_PRD_CREDENTIALS }}
 
-      - name: Scale down container to prevent conflicts
+      - name: Scale down running container
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            echo "Scaling down container app to 0 replicas..."
             az containerapp update \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --min-replicas 0 \
-              --max-replicas 0 || echo "Failed to scale down, continuing anyway"
-            echo "Waiting 15 seconds for complete shutdown..."
+              --max-replicas 0
             sleep 15
 
-      - name: Update Azure Container App with new image
+      - name: Update Azure Container App
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            echo "Updating container app with new image and scaling back up..."
             az containerapp update \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
@@ -108,7 +105,6 @@ jobs:
               --min-replicas 1 \
               --max-replicas 1 \
               --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
-            echo "Deployment completed successfully!"
 
       - name: Logout from Azure
         run: |
