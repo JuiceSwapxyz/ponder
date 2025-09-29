@@ -88,20 +88,22 @@ jobs:
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            # Get current active revision and deactivate it
-            CURRENT_REVISION=$(az containerapp revision list \
+            # Get all revisions
+            ALL_REVISIONS=$(az containerapp revision list \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
-              --query "[?properties.active].name" \
+              --query "[].name" \
               --output tsv)
 
-            if [ ! -z "$CURRENT_REVISION" ]; then
-              echo "Deactivating revision: $CURRENT_REVISION"
-              az containerapp revision deactivate \
+            # Delete all existing revisions
+            for revision in $ALL_REVISIONS; do
+              echo "Deleting revision: $revision"
+              az containerapp revision delete \
                 --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
                 --name ${{ env.AZURE_CONTAINER_APP }} \
-                --revision $CURRENT_REVISION
-            fi
+                --revision $revision \
+                --yes || true
+            done
             sleep 10
 
       - name: Update Azure Container App
