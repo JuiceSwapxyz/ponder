@@ -84,48 +84,30 @@ jobs:
         with:
           creds: ${{ secrets.DFX_DEV_CREDENTIALS }}
 
-      - name: Get current revision
+      - name: Update Azure Container App
         uses: azure/CLI@v2
         with:
           inlineScript: |
+            echo "Updating container app with new image${{ inputs.reset_schema == true && ' (with schema reset)' || '' }}"
+
             CURRENT_REVISION=$(az containerapp revision list \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --query "[?properties.active].name" \
               --output tsv | head -1)
+            
             echo "CURRENT_REVISION=$CURRENT_REVISION" >> $GITHUB_ENV
-            echo "Current revision: $CURRENT_REVISION"
-
-      - name: Update container app with schema reset
-        # if: inputs.reset_schema == true
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
+            
             az containerapp update \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --image ${{ env.DOCKER_TAGS }} \
               --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
-              
 
-            echo "Deactivating current revision: $CURRENT_REVISION"
             az containerapp revision deactivate \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --revision $CURRENT_REVISION
-
-      # - name: Restart revision
-      #   if: inputs.reset_schema != true
-      #   uses: azure/CLI@v2
-      #   with:
-      #     inlineScript: |
-      #       echo "Restarting revision: $CURRENT_REVISION"
-      #       az containerapp revision restart \
-      #         --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-      #         --name ${{ env.AZURE_CONTAINER_APP }} \
-      #         --revision $CURRENT_REVISION
-
-      # --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }} PONDER_SCHEMA_VERSION=${{ github.run_number }}
 
       - name: Logout from Azure
         run: |
