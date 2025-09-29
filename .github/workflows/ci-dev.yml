@@ -84,28 +84,6 @@ jobs:
         with:
           creds: ${{ secrets.DFX_DEV_CREDENTIALS }}
 
-      - name: Stop Azure Container App
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            # Get all revisions
-            ALL_REVISIONS=$(az containerapp revision list \
-              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-              --name ${{ env.AZURE_CONTAINER_APP }} \
-              --query "[].name" \
-              --output tsv)
-
-            # Delete all existing revisions
-            for revision in $ALL_REVISIONS; do
-              echo "Deleting revision: $revision"
-              az containerapp revision delete \
-                --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                --name ${{ env.AZURE_CONTAINER_APP }} \
-                --revision $revision \
-                --yes || true
-            done
-            sleep 10
-
       - name: Update Azure Container App
         uses: azure/CLI@v2
         with:
@@ -116,6 +94,7 @@ jobs:
               --image ${{ env.DOCKER_TAGS }} \
               --min-replicas 1 \
               --max-replicas 1 \
+              --revision-mode Single \
               --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
 
       - name: Logout from Azure
