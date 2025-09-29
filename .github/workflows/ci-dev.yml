@@ -84,32 +84,30 @@ jobs:
         with:
           creds: ${{ secrets.DFX_DEV_CREDENTIALS }}
 
-      - name: Scale down container to prevent conflicts
+      - name: Update Azure Container App
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            echo "Scaling down container app to 0 replicas..."
-            az containerapp update \
+            echo "Updating container app${{ inputs.reset_schema == true && ' (with schema reset)' || '' }}"
+
+            CURRENT_REVISION=$(az containerapp revision list \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
-              --min-replicas 0 \
-              --max-replicas 0 || echo "Failed to scale down, continuing anyway"
-            echo "Waiting 15 seconds for complete shutdown..."
-            sleep 15
-
-      - name: Update Azure Container App with new image
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            echo "Updating container app with new image and scaling back up..."
+              --query "[?properties.active].name" \
+              --output tsv | head -1)
+            
+            echo "CURRENT_REVISION=$CURRENT_REVISION" >> $GITHUB_ENV
+            
             az containerapp update \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --image ${{ env.DOCKER_TAGS }} \
-              --min-replicas 1 \
-              --max-replicas 1 \
               --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
-            echo "Deployment completed successfully!"
+
+            az containerapp revision deactivate \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name ${{ env.AZURE_CONTAINER_APP }} \
+              --revision $CURRENT_REVISION
 
       - name: Logout from Azure
         run: |
