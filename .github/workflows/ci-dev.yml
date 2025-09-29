@@ -84,16 +84,25 @@ jobs:
         with:
           creds: ${{ secrets.DFX_DEV_CREDENTIALS }}
 
-      - name: Scale down running container
+      - name: Stop Azure Container App
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            az containerapp update \
+            # Get current active revision and deactivate it
+            CURRENT_REVISION=$(az containerapp revision list \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
-              --min-replicas 0 \
-              --max-replicas 0
-            sleep 15
+              --query "[?properties.active].name" \
+              --output tsv)
+
+            if [ ! -z "$CURRENT_REVISION" ]; then
+              echo "Deactivating revision: $CURRENT_REVISION"
+              az containerapp revision deactivate \
+                --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+                --name ${{ env.AZURE_CONTAINER_APP }} \
+                --revision $CURRENT_REVISION
+            fi
+            sleep 10
 
       - name: Update Azure Container App
         uses: azure/CLI@v2
