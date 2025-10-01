@@ -573,7 +573,7 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get current block number from Citrea RPC
     try {
-      const rpcUrl = process.env.CITREA_RPC_URL || "https://rpc.testnet.citrea.xyz";
+      const rpcUrl = process.env.CITREA_RPC_URL || "http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8080";
       const response = await fetch(rpcUrl, {
         method: "POST",
         headers: {

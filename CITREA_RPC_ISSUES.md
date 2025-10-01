@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The Citrea Testnet RPC endpoint (`https://rpc.testnet.citrea.xyz`) is currently incompatible with Ponder indexer due to fundamental data consistency issues in the RPC responses. These issues prevent Ponder from successfully syncing blockchain data.
+The Citrea Testnet RPC endpoint (`http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8080`) is currently incompatible with Ponder indexer due to fundamental data consistency issues in the RPC responses. These issues prevent Ponder from successfully syncing blockchain data.
 
 ## Issues Identified
 
@@ -18,14 +18,14 @@ The Citrea Testnet RPC endpoint (`https://rpc.testnet.citrea.xyz`) is currently 
    - **Verification Commands**:
      ```bash
      # Get block transaction count
-     curl -X POST https://rpc.testnet.citrea.xyz \
+     curl -X POST http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8080 \
        -H "Content-Type: application/json" \
        -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0xf02c50",true],"id":1}' \
        | jq '.result.transactions | length'
      # Result: 3
 
      # Get logs for the block
-     curl -X POST https://rpc.testnet.citrea.xyz \
+     curl -X POST http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8080 \
        -H "Content-Type: application/json" \
        -d '{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock":"0xf02c50","toBlock":"0xf02c50"}],"id":1}' \
        | jq '.result[0].transactionIndex'
@@ -158,7 +158,7 @@ These are fundamental data integrity issues in the Citrea RPC layer, not bugs in
 
 - **Date**: 2024-09-23
 - **Ponder Version**: 0.13.1
-- **Citrea RPC**: https://rpc.testnet.citrea.xyz
+- **Citrea RPC**: http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8080
 - **Chain ID**: 5115
 - **Tested Blocks**: 15740496, 15741979, 15743908, 15786510
 - **Repository**: https://github.com/JuiceSwapxyz/ponder
