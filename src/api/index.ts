@@ -519,6 +519,115 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
   }
 });
 
+// Campaign hourly completion stats for historical tracking
+app.get("/campaign/hourly-completion-stats", async (c: Context) => {
+  try {
+    const chainId = c.req.query('chainId') || '5115';
+    const hours = parseInt(c.req.query('hours') || '168'); // Last 7 days by default
+
+    if (Number(chainId) !== 5115) {
+      return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
+    }
+
+    // Get all completions (we need full history to calculate cumulative stats per hour)
+    const allCompletions = await db
+      .select()
+      .from(taskCompletion)
+      .where(eq(taskCompletion.chainId, Number(chainId)))
+      .orderBy(taskCompletion.completedAt);
+
+    // Track user progress over time
+    const hourlySnapshots = new Map<string, {
+      hour: string;
+      timestamp: number;
+      usersWithAtLeastOneTask: Set<string>;
+      usersWithAllTasks: Map<string, Set<number>>;
+    }>();
+
+    const userTasksHistory = new Map<string, Set<number>>();
+
+    for (const completion of allCompletions) {
+      const timestamp = Number(completion.completedAt);
+      const hour = new Date(timestamp * 1000).toISOString().slice(0, 13) + ':00:00Z';
+      const userKey = completion.walletAddress.toLowerCase();
+
+      // Update user's task history
+      if (!userTasksHistory.has(userKey)) {
+        userTasksHistory.set(userKey, new Set());
+      }
+      userTasksHistory.get(userKey)!.add(completion.taskId);
+
+      // Create snapshot for this hour if it doesn't exist
+      if (!hourlySnapshots.has(hour)) {
+        hourlySnapshots.set(hour, {
+          hour,
+          timestamp,
+          usersWithAtLeastOneTask: new Set(),
+          usersWithAllTasks: new Map()
+        });
+      }
+
+      const snapshot = hourlySnapshots.get(hour)!;
+      snapshot.usersWithAtLeastOneTask.add(userKey);
+
+      // Store the current state of user's tasks at this hour
+      snapshot.usersWithAllTasks.set(userKey, new Set(userTasksHistory.get(userKey)));
+    }
+
+    // Convert to array and calculate stats
+    const sortedSnapshots = Array.from(hourlySnapshots.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]));
+
+    // Build cumulative data
+    const cumulativeUsers = new Set<string>();
+    const cumulativeCompletedUsers = new Set<string>();
+
+    const result = sortedSnapshots.map(([hour, snapshot]) => {
+      // Add all users active in this hour to cumulative set
+      snapshot.usersWithAtLeastOneTask.forEach(user => cumulativeUsers.add(user));
+
+      // Check which users have completed all 3 tasks by this hour
+      for (const [user, tasks] of snapshot.usersWithAllTasks.entries()) {
+        if (tasks.size === 3) {
+          cumulativeCompletedUsers.add(user);
+        }
+      }
+
+      return {
+        hour,
+        totalParticipants: cumulativeUsers.size,
+        completedAllTasks: cumulativeCompletedUsers.size,
+        completionRate: cumulativeUsers.size > 0
+          ? Number(((cumulativeCompletedUsers.size / cumulativeUsers.size) * 100).toFixed(2))
+          : 0
+      };
+    });
+
+    // Filter to requested time window
+    const cutoffTime = Math.floor(Date.now() / 1000) - (hours * 3600);
+    const filtered = result.filter(item => {
+      const itemTime = new Date(item.hour).getTime() / 1000;
+      return itemTime >= cutoffTime;
+    });
+
+    return c.json({
+      chainId: Number(chainId),
+      period: `${hours} hours`,
+      data: filtered,
+      summary: {
+        totalHours: filtered.length,
+        currentParticipants: filtered[filtered.length - 1]?.totalParticipants || 0,
+        currentCompleted: filtered[filtered.length - 1]?.completedAllTasks || 0,
+        currentCompletionRate: filtered[filtered.length - 1]?.completionRate || 0
+      }
+    });
+
+  } catch (error) {
+    console.error("Campaign hourly completion stats API error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 // Info endpoint
 app.get("/api/info", async (c: Context) => {
   return c.json({
