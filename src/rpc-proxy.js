@@ -4,7 +4,7 @@ import axios from 'axios';
 const app = express();
 app.use(express.json());
 
-const CITREA_RPC = 'http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8080';
+const CITREA_RPC = 'http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085';
 
 app.post('/', async (req, res) => {
   try {
