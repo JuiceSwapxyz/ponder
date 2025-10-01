@@ -12,7 +12,7 @@ import { createPublicClient, http, parseAbiItem, decodeEventLog } from 'viem';
 // Citrea Testnet configuration
 const CITREA_TESTNET = {
   chainId: 5115,
-  rpcUrl: 'https://rpc.testnet.citrea.xyz'
+  rpcUrl: 'http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085'
 };
 
 // Problematic transaction details
