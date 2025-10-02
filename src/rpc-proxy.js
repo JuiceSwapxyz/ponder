@@ -4,14 +4,7 @@ import axios from 'axios';
 const app = express();
 app.use(express.json());
 
-const getDefaultRpcUrl = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  return isProduction
-    ? 'http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085'
-    : 'http://vm-dfx-node-dev.westeurope.cloudapp.azure.com:8085';
-};
-
-const CITREA_RPC = process.env.CITREA_RPC_URL || getDefaultRpcUrl();
+const CITREA_RPC = process.env.CITREA_RPC_URL;
 
 app.post('/', async (req, res) => {
   try {

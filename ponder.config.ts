@@ -4,19 +4,12 @@ import { citreaTransport } from "./citrea-transport-fix";
 import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager";
 import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
 
-const getDefaultRpcUrl = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  return isProduction
-    ? "http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085"
-    : "http://vm-dfx-node-dev.westeurope.cloudapp.azure.com:8085";
-};
-
 export default createConfig({
   chains: {
     // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? getDefaultRpcUrl()), {
+      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL!), {
         requestsPerSecond: 30
       }),
     },
