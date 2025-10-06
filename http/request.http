@@ -1,0 +1,29 @@
+POST http://localhost:42069/tokens/byAddress
+Content-Type: application/json
+
+{
+  "address": "0x4370e27F7d91D9341bFf232d7Ee8bdfE3a9933a0"
+}
+
+#### All
+
+GET http://localhost:42069/tokens/all
+Content-Type: application/json
+
+### By Addresses
+
+POST http://localhost:42069/tokens/byAddresses
+Content-Type: application/json
+
+{
+    "contracts": [
+        {
+            "chainId": 5115,
+            "address": "0x2ffc18ac99d367b70dd922771df8c2074af4ace0"
+        },
+        {
+            "chainId": 5115,
+            "address": "0x36c16eac6b0ba6c50f494914ff015fca95b7835f"
+        }
+    ]
+}
