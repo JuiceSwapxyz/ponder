@@ -3,6 +3,7 @@ import { UniswapV3PoolAbi } from "./abis/UniswapV3Pool";
 import { citreaTransport } from "./citrea-transport-fix";
 import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager";
 import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
+import { SwapRouter02Abi } from "./abis/SwapRouter02";
 
 export default createConfig({
   chains: {
@@ -10,7 +11,7 @@ export default createConfig({
     citreaTestnet: {
       id: 5115,
       rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085"), {
-        requestsPerSecond: 30
+        requestsPerSecond: 40
       }),
     },
   },
@@ -57,6 +58,20 @@ export default createConfig({
       address: "0x6832283eEA5a9A3C4384A5D9a06Db0ce6FE9C79E",
       abi: UniswapV3FactoryAbi as any,
       startBlock: 15455001,
+    },
+    SwapRouter02: {
+      chain: "citreaTestnet",
+      address: "0x610c98EAD0df13EA906854b6041122e8A8D14413",
+      abi: SwapRouter02Abi as any,
+      startBlock: 15455029,
+      includeCallTraces: true,
     }
   },
+  blocks: {
+    TimeSeriesMinute: {
+      chain: "citreaTestnet",
+      startBlock: 15455029,
+      interval: 15,
+    }
+  }
 });
