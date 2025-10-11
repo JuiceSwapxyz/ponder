@@ -34,7 +34,7 @@ ponder.on(
   async ({ event, context }: { event: any; context: any }) => {
     // UniswapV3Factory:PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)
     await context.db.insert(pool).values({
-      id: `${event.transaction.hash}-${event.logIndex}`,
+      id: getAddress(event.args.pool),
       chainId: 5115,
       address: getAddress(event.args.pool),
       token0: getAddress(event.args.token0),

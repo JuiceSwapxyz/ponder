@@ -126,8 +126,6 @@ export const transactionSwap = onchainTable("transactionSwap", (t) => ({
   tokenOut: t.hex().notNull(),
   amountIn: t.bigint().notNull(),
   amountOut: t.bigint().notNull(),
-  fee: t.bigint(),
-  methodSignature: t.text(),
 }));
 
 export const poolActivity = onchainTable("poolActivity", (t) => ({
@@ -163,10 +161,4 @@ export const poolStat = onchainTable("poolStat", (t) => ({
   volume0: t.bigint().notNull(),
   volume1: t.bigint().notNull(),
   type: t.text().notNull(), // "1h", "24h", "all-time"
-}));
-
-export const blockIndexingProgress = onchainTable("blockIndexingProgress", (t) => ({
-  id: t.text().primaryKey(), // Always set to "latest"
-  latestBlock: t.bigint().notNull(),
-  latestTimestamp: t.bigint().notNull(),
 }));
