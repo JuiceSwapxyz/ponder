@@ -14,6 +14,7 @@ import { graphql } from "ponder"; // @ts-ignore
 import positions from "./controllers/positions";
 import pools from "./controllers/pools";
 import tokens from "./controllers/tokens";
+import exploreStats from "./controllers/exploreStats";
 
 
 const app = new Hono();
@@ -43,6 +44,8 @@ app.use("/graphql", graphql({ db, schema }));
 app.route("/positions", positions);
 app.route("/pools", pools);
 app.route("/tokens", tokens);
+app.route("/exploreStats", exploreStats);
+
 
 // Campaign Progress API Endpoint (GET with query params)
 app.get("/campaign/progress", async (c) => {

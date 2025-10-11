@@ -1,8 +1,9 @@
-import { createConfig, rateLimit } from "ponder";
+import { createConfig, factory, rateLimit } from "ponder";
 import { UniswapV3PoolAbi } from "./abis/UniswapV3Pool";
 import { citreaTransport } from "./citrea-transport-fix";
 import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager";
 import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
+import { parseAbiItem } from "viem";
 
 export default createConfig({
   chains: {
@@ -10,7 +11,7 @@ export default createConfig({
     citreaTestnet: {
       id: 5115,
       rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085"), {
-        requestsPerSecond: 30
+        requestsPerSecond: 40
       }),
     },
   },
@@ -24,7 +25,7 @@ export default createConfig({
         event: "Swap",
         args: {},
       } as any,
-      startBlock: 15455001,
+      startBlock: 15805014,
     },
     CBTCcUSDPool_CitreaTestnet: {
       chain: "citreaTestnet",
@@ -34,7 +35,7 @@ export default createConfig({
         event: "Swap",
         args: {},
       } as any,
-      startBlock: 15455001,
+      startBlock: 15615173,
     },
     CBTCUSDCPool_CitreaTestnet: {
       chain: "citreaTestnet",
@@ -44,19 +45,29 @@ export default createConfig({
         event: "Swap",
         args: {},
       } as any,
-      startBlock: 15455001,
+      startBlock: 15804939,
     },
     NonfungiblePositionManager: {
       chain: "citreaTestnet",
       address: "0xe46616BED47317653EE3B7794fC171F4444Ee1c5",
       abi: NonfungiblePositionManagerAbi as any,
-      startBlock: 15455001,
+      startBlock: 15455019,
     },
     UniswapV3Factory: {
       chain: "citreaTestnet",
       address: "0x6832283eEA5a9A3C4384A5D9a06Db0ce6FE9C79E",
       abi: UniswapV3FactoryAbi as any,
       startBlock: 15455001,
+    },
+    UniswapV3Pool: {
+      chain: "citreaTestnet",
+      abi: UniswapV3PoolAbi as any,
+      startBlock: 15455001,
+      address: factory({
+        address: "0x6832283eEA5a9A3C4384A5D9a06Db0ce6FE9C79E",
+        event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
+        parameter: "pool",
+      })
     }
   },
 });
