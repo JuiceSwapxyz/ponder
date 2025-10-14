@@ -5,7 +5,7 @@ import { db } from "ponder:api";
 // @ts-ignore
 import schema from "ponder:schema";
 // @ts-ignore
-import { taskCompletion, swap, pool, position } from "ponder:schema";
+import { taskCompletion, nftClaim, swap, pool, position } from "ponder:schema";
 import { eq, and, desc, count, gt } from "drizzle-orm";
 
 import { graphql } from "ponder"; // @ts-ignore
@@ -125,6 +125,23 @@ app.get("/campaign/progress", async (c) => {
     const totalTasks = allTasks.length;
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
+    // Query NFT claim status
+    let nftClaimData = null;
+    try {
+      const nftClaims = await db
+        .select()
+        .from(nftClaim)
+        .where(and(
+          eq(nftClaim.walletAddress, normalizedAddress),
+          eq(nftClaim.chainId, Number(chainId))
+        ))
+        .limit(1);
+
+      nftClaimData = nftClaims.length > 0 ? nftClaims[0] : null;
+    } catch (dbError) {
+      console.warn(`NFT claim query failed for ${normalizedAddress}:`, dbError);
+    }
+
     // Build response
     const response = {
       walletAddress: String(walletAddress),
@@ -133,8 +150,8 @@ app.get("/campaign/progress", async (c) => {
       totalTasks: totalTasks,
       completedTasks: completedTasks,
       progress: Number(progress.toFixed(2)),
-      nftClaimed: false, // Not implemented yet
-      claimTxHash: null
+      nftClaimed: !!nftClaimData,
+      claimTxHash: nftClaimData?.txHash || null
     };
 
 
@@ -224,6 +241,23 @@ app.post("/campaign/progress", async (c) => {
     const totalTasks = allTasks.length;
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
+    // Query NFT claim status
+    let nftClaimData = null;
+    try {
+      const nftClaims = await db
+        .select()
+        .from(nftClaim)
+        .where(and(
+          eq(nftClaim.walletAddress, normalizedAddress),
+          eq(nftClaim.chainId, Number(chainId))
+        ))
+        .limit(1);
+
+      nftClaimData = nftClaims.length > 0 ? nftClaims[0] : null;
+    } catch (dbError) {
+      console.warn(`NFT claim query failed for ${normalizedAddress}:`, dbError);
+    }
+
     // Build response
     const response = {
       walletAddress: walletAddress,
@@ -232,8 +266,8 @@ app.post("/campaign/progress", async (c) => {
       totalTasks: totalTasks,
       completedTasks: completedTasks,
       progress: Number(progress.toFixed(2)),
-      nftClaimed: false, // Not implemented yet
-      claimTxHash: null
+      nftClaimed: !!nftClaimData,
+      claimTxHash: nftClaimData?.txHash || null
     };
 
 

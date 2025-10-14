@@ -1,5 +1,6 @@
 import { createConfig, factory, rateLimit } from "ponder";
 import { UniswapV3PoolAbi } from "./abis/UniswapV3Pool";
+import { FirstSqueezerNFTAbi } from "./abis/FirstSqueezerNFT";
 import { citreaTransport } from "./citrea-transport-fix";
 import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager";
 import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
@@ -16,6 +17,17 @@ export default createConfig({
     },
   },
   contracts: {
+    // CITREA TESTNET - First Squeezer NFT Campaign
+    FirstSqueezerNFT: {
+      chain: "citreaTestnet",
+      address: "0xcF62B46fF36a6FcABf4C0056c535A0cA41E7c03b",
+      abi: FirstSqueezerNFTAbi as any,
+      filter: {
+        event: "NFTClaimed",
+        args: {},
+      } as any,
+      startBlock: 16280000,
+    },
     // CITREA TESTNET - UniswapV3 Pool Contracts for Citrea bApps Campaign
     CBTCNUSDPool_CitreaTestnet: {
       chain: "citreaTestnet",
