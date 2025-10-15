@@ -5,8 +5,8 @@ import { db } from "ponder:api";
 // @ts-ignore
 import schema from "ponder:schema";
 // @ts-ignore
-import { taskCompletion, nftClaim, swap, pool, position } from "ponder:schema";
-import { eq, and, desc, count, gt, sql } from "drizzle-orm";
+import { taskCompletion, nftClaim, swap, pool, position, syncProgress } from "ponder:schema";
+import { eq, and, desc, count, gt } from "drizzle-orm";
 
 import { graphql } from "ponder"; // @ts-ignore
 
@@ -699,14 +699,16 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get latest indexed block and counts from database
     try {
-      // Get latest indexed block from Ponder's internal sync table
-      // This represents actual indexing progress, not just event-based blocks
-      const blockResult = await db.execute(
-        sql`SELECT MAX(number) as max_block FROM ponder_sync.blocks`
-      );
+      // Get latest indexed block from our syncProgress table
+      // This table is updated every 10 blocks by our block interval handler
+      const progress = await db
+        .select()
+        .from(syncProgress)
+        .where(eq(syncProgress.id, "citreaTestnet"))
+        .limit(1);
 
-      if (blockResult.rows[0]?.max_block) {
-        latestIndexedBlock = Number(blockResult.rows[0].max_block);
+      if (progress.length > 0) {
+        latestIndexedBlock = Number(progress[0].latestBlock);
       }
 
       // Get counts

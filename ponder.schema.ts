@@ -172,3 +172,10 @@ export const poolStat = onchainTable("poolStat", (t) => ({
   volume1: t.bigint().notNull(),
   type: t.text().notNull(), // "1h", "24h", "all-time"
 }));
+
+export const syncProgress = onchainTable("syncProgress", (t) => ({
+  id: t.text().primaryKey(), // Chain identifier (e.g., "citreaTestnet")
+  chainId: t.integer().notNull(),
+  latestBlock: t.bigint().notNull(), // Latest indexed block number
+  lastUpdated: t.bigint().notNull(), // Timestamp of last update
+}));
