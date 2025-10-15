@@ -103,6 +103,11 @@ ponder.on(
       (log: any) => log.topics[0] === uniswapV3PoolMintEventTopic
     );
 
+    if (!poolMintEvent) {
+      console.warn("No Mint event found in transaction logs");
+      return;
+    }
+
     const poolMintEventDecoded = decodeEventLog({
       abi: UniswapV3PoolAbi,
       data: poolMintEvent.data,
