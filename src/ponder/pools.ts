@@ -121,9 +121,7 @@ ponder.on(
         event.args.amount1 > 0n ? event.args.amount1 : event.args.amount0;
 
       await context.db.insert(transactionSwap).values({
-        id: `${event.transaction.hash}-${getAddress(tokenIn)}-${getAddress(
-          tokenOut
-        )}-${amountIn}-${amountOut}`,
+        id: event.id,
         txHash: event.transaction.hash,
         chainId: 5115,
         blockNumber: event.block.number,
