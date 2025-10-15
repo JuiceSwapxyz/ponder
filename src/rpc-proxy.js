@@ -4,7 +4,11 @@ import axios from 'axios';
 const app = express();
 app.use(express.json());
 
-const CITREA_RPC = process.env.CITREA_RPC_URL ?? 'http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085';
+const CITREA_RPC = process.env.CITREA_RPC_URL;
+
+if (!CITREA_RPC) {
+  throw new Error('CITREA_RPC_URL environment variable is required');
+}
 
 app.post('/', async (req, res) => {
   try {

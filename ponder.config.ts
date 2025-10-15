@@ -11,7 +11,7 @@ export default createConfig({
     // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085"), {
+      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL!), {
         requestsPerSecond: 40
       }),
     },

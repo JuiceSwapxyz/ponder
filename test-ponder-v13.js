@@ -12,8 +12,12 @@ import { createPublicClient, http, parseAbiItem, decodeEventLog } from 'viem';
 // Citrea Testnet configuration
 const CITREA_TESTNET = {
   chainId: 5115,
-  rpcUrl: process.env.CITREA_RPC_URL ?? 'http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085'
+  rpcUrl: process.env.CITREA_RPC_URL
 };
+
+if (!CITREA_TESTNET.rpcUrl) {
+  throw new Error('CITREA_RPC_URL environment variable is required');
+}
 
 // Problematic transaction details
 const PROBLEMATIC_TX = '0x89234270e8ace0e3c172ef48cea48a1f0df22a071170bdedc9e07b36721b8630';

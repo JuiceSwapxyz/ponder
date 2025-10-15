@@ -719,7 +719,10 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get current block number from Citrea RPC
     try {
-      const rpcUrl = process.env.CITREA_RPC_URL ?? "http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085";
+      const rpcUrl = process.env.CITREA_RPC_URL;
+      if (!rpcUrl) {
+        throw new Error('CITREA_RPC_URL environment variable is required');
+      }
       const response = await fetch(rpcUrl, {
         method: "POST",
         headers: {
