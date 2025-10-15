@@ -112,7 +112,7 @@ ponder.on(
     if (poolMintEventDecoded.eventName === "Mint") {
       const mintArgs = poolMintEventDecoded.args as any;
       await context.db.insert(position).values({
-        id: `${event.transaction.hash}-${event.logIndex}`,
+        id: event.id,
         owner: getAddress(event.args.to),
         poolAddress: getAddress(poolMintEvent.address),
         tokenId: event.args.tokenId.toString(),
