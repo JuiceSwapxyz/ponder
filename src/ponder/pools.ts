@@ -26,22 +26,24 @@ const updateTokenStat = async ({
   tokenAddress: string;
   amount: bigint;
 }) => {
-  TEMPORAL_FRAMES.forEach(async (type) => {
-    await context.db
-      .insert(tokenStat)
-      .values({
-        id: getIdByTemporalFrame(tokenAddress, type, timestamp),
-        address: getAddress(tokenAddress),
-        timestamp: timestamp,
-        txCount: 1,
-        volume: amount,
-        type: type,
-      })
-      .onConflictDoUpdate((row: any) => ({
-        txCount: row.txCount + 1,
-        volume: row.volume + amount,
-      }));
-  });
+  await Promise.all(
+    TEMPORAL_FRAMES.map(async (type) => {
+      return context.db
+        .insert(tokenStat)
+        .values({
+          id: getIdByTemporalFrame(tokenAddress, type, timestamp),
+          address: getAddress(tokenAddress),
+          timestamp: timestamp,
+          txCount: 1,
+          volume: amount,
+          type: type,
+        })
+        .onConflictDoUpdate((row: any) => ({
+          txCount: row.txCount + 1,
+          volume: row.volume + amount,
+        }));
+    })
+  );
 };
 
 const updatePoolStat = async ({
@@ -57,24 +59,26 @@ const updatePoolStat = async ({
   amount0: bigint;
   amount1: bigint;
 }) => {
-  TEMPORAL_FRAMES.forEach(async (type) => {
-    await context.db
-      .insert(poolStat)
-      .values({
-        id: getIdByTemporalFrame(poolAddress, type, timestamp),
-        poolAddress: getAddress(poolAddress),
-        timestamp: timestamp,
-        txCount: 1,
-        volume0: amount0,
-        volume1: amount1,
-        type: type,
-      })
-      .onConflictDoUpdate((row: any) => ({
-        txCount: row.txCount + 1,
-        volume0: row.volume0 + amount0,
-        volume1: row.volume1 + amount1,
-      }));
-  });
+  await Promise.all(
+    TEMPORAL_FRAMES.map(async (type) => {
+      return context.db
+        .insert(poolStat)
+        .values({
+          id: getIdByTemporalFrame(poolAddress, type, timestamp),
+          poolAddress: getAddress(poolAddress),
+          timestamp: timestamp,
+          txCount: 1,
+          volume0: amount0,
+          volume1: amount1,
+          type: type,
+        })
+        .onConflictDoUpdate((row: any) => ({
+          txCount: row.txCount + 1,
+          volume0: row.volume0 + amount0,
+          volume1: row.volume1 + amount1,
+        }));
+    })
+  );
 };
 
 ponder.on(
@@ -117,9 +121,7 @@ ponder.on(
         event.args.amount1 > 0n ? event.args.amount1 : event.args.amount0;
 
       await context.db.insert(transactionSwap).values({
-        id: `${event.transaction.hash}-${getAddress(tokenIn)}-${getAddress(
-          tokenOut
-        )}-${amountIn}-${amountOut}`,
+        id: event.id,
         txHash: event.transaction.hash,
         chainId: 5115,
         blockNumber: event.block.number,
