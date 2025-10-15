@@ -9,9 +9,11 @@ const exploreStats = new Hono();
 
 exploreStats.get("/", async (c: Context) => {
   try {
-    const transactionStats = await computeTxStats();
-    const tokenStats = await computeTokenStats();
-    const poolStatsV3 = await computePoolStatsV3();
+    const [transactionStats, tokenStats, poolStatsV3] = await Promise.all([
+      computeTxStats(),
+      computeTokenStats(),
+      computePoolStatsV3(),
+    ]);
 
     return c.json({
       stats: {
