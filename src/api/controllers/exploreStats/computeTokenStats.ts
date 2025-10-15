@@ -1,7 +1,7 @@
 // @ts-ignore
 import { token, tokenStat } from "ponder.schema";
 
-import { desc, eq, and, inArray } from "ponder";
+import { eq, and } from "ponder";
 // @ts-ignore
 import { db } from "ponder:api";
 import { getAddress } from "viem";
@@ -14,9 +14,8 @@ export const computeTokenStatsByAddress = async (
     .select()
     .from(tokenStat)
     .where(
-      and(eq(tokenStat.type, "1h"), eq(tokenStat.address, getAddress(address)))
+      and(eq(tokenStat.type, "all-time"), eq(tokenStat.address, getAddress(address)))
     )
-    .orderBy(desc(tokenStat.timestamp))
     .limit(1);
 
   if (tokenStats.length === 0) {
@@ -36,66 +35,36 @@ export const computeTokenStatsByAddress = async (
 };
 
 export const computeTokenStats = async () => {
-  const tokenStats = await db
-    .select()
-    .from(tokenStat)
-    .where(and(eq(tokenStat.type, "1h")))
-    .orderBy(desc(tokenStat.timestamp))
-    .limit(50);
-
-  const tokenStatsByAddress: string[] = tokenStats
-    .reduce(
-      (
-        acc: { address: string; txCount: number }[],
-        stat: { address: string; txCount: number }
-      ) => {
-        const existing = acc.find(
-          (item: { address: string }) => item.address === stat.address
-        );
-        if (existing) {
-          existing.txCount += stat.txCount;
-        } else {
-          acc.push({ ...stat });
-        }
-        return acc;
-      },
-      []
-    )
-    .sort(
-      (a: { txCount: number }, b: { txCount: number }) =>
-        Number(b.txCount) - Number(a.txCount)
-    )
-    .map((stat: { address: string }) => stat.address)
-    .slice(0, 5);
-
-  const tokens = await db
-    .select()
-    .from(token)
-    .where(
-      inArray(
-        token.address,
-        tokenStatsByAddress.map((addr) => getAddress(addr))
-      )
-    );
+  const [tokens, tokenStats] = await Promise.all([
+    db.select().from(token),
+    db
+      .select()
+      .from(tokenStat)
+      .where(eq(tokenStat.type, "all-time")),
+  ]);
 
   const tokenMap: Map<string, any> = new Map(
     tokens.map((t: any) => [t.address.toLowerCase(), t])
   );
 
-  const serializedTokenStats = tokenStatsByAddress.map((address: string) => {
-    const stats = tokenStats.find(
-      (stat: { address: string }) => stat.address === address
-    );
+  const statsMap = new Map<string, any>();
+  for (const stat of tokenStats) {
+    statsMap.set(stat.address.toLowerCase(), stat);
+  }
 
-    const tokenDataWithMock = getTokenStatFormatWithMock(address, tokenMap);
+  const serializedTokenStats = Array.from(statsMap.values())
+    .map((stat: any) => {
+      const address = stat.address;
+      const tokenDataWithMock = getTokenStatFormatWithMock(address, tokenMap);
 
-    return {
-      timestamp: stats.timestamp.toString(),
-      txCount: stats.txCount.toString(),
-      volume: stats.volume.toString(),
-      ...tokenDataWithMock,
-    };
-  });
+      return {
+        timestamp: stat.timestamp.toString(),
+        txCount: stat.txCount.toString(),
+        volume: stat.volume.toString(),
+        ...tokenDataWithMock,
+      };
+    })
+    .sort((a: any, b: any) => Number(b.txCount) - Number(a.txCount));
 
   return serializedTokenStats;
 };

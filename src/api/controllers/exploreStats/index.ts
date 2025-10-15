@@ -1,11 +1,20 @@
 // @ts-ignore
 import { Context, Hono } from "hono";
+import { cache } from "hono/cache";
 // @ts-ignore
 import { computeTxStats } from "./computeTxStats";
 import { computeTokenStats } from "./computeTokenStats";
 import { computePoolStatsV3 } from "./computePoolStatsV3";
 
 const exploreStats = new Hono();
+
+exploreStats.use(
+  "*",
+  cache({
+    cacheName: "exploreStats",
+    cacheControl: "max-age=30",
+  })
+);
 
 exploreStats.get("/", async (c: Context) => {
   try {
