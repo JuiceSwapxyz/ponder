@@ -1,9 +1,7 @@
 import { Context, Next } from "hono";
 // @ts-ignore
 import { db } from "ponder:api";
-// @ts-ignore
-import { swap } from "ponder:schema";
-import { desc } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 
 // Start block from ponder.config.ts
 const START_BLOCK = 15455001;
@@ -23,15 +21,14 @@ async function getSyncStatus(): Promise<boolean> {
   }
 
   try {
-    // Get latest indexed block from database
-    const latestSwap = await db
-      .select()
-      .from(swap)
-      .orderBy(desc(swap.blockNumber))
-      .limit(1);
+    // Get latest indexed block from Ponder's internal sync table
+    // This represents the actual indexing progress, not just event-based blocks
+    const result = await db.execute(
+      sql`SELECT MAX(number) as max_block FROM ponder_sync.blocks`
+    );
 
-    const latestIndexedBlock = latestSwap.length > 0
-      ? Number(latestSwap[0].blockNumber)
+    const latestIndexedBlock = result.rows[0]?.max_block
+      ? Number(result.rows[0].max_block)
       : 0;
 
     // Get current chain block from RPC

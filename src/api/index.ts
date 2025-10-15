@@ -6,7 +6,7 @@ import { db } from "ponder:api";
 import schema from "ponder:schema";
 // @ts-ignore
 import { taskCompletion, nftClaim, swap, pool, position } from "ponder:schema";
-import { eq, and, desc, count, gt } from "drizzle-orm";
+import { eq, and, desc, count, gt, sql } from "drizzle-orm";
 
 import { graphql } from "ponder"; // @ts-ignore
 
@@ -699,15 +699,14 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get latest indexed block and counts from database
     try {
-      // Get latest swap block number
-      const latestSwap = await db
-        .select()
-        .from(swap)
-        .orderBy(desc(swap.blockNumber))
-        .limit(1);
+      // Get latest indexed block from Ponder's internal sync table
+      // This represents actual indexing progress, not just event-based blocks
+      const blockResult = await db.execute(
+        sql`SELECT MAX(number) as max_block FROM ponder_sync.blocks`
+      );
 
-      if (latestSwap.length > 0) {
-        latestIndexedBlock = Number(latestSwap[0].blockNumber);
+      if (blockResult.rows[0]?.max_block) {
+        latestIndexedBlock = Number(blockResult.rows[0].max_block);
       }
 
       // Get counts
