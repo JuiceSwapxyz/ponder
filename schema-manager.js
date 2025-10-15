@@ -69,6 +69,7 @@ async function performSchemaReset(database, schema) {
       `, [schemaName]);
 
       for (const row of tablesResult.rows) {
+        console.log(`Dropping table ${schemaName}.${row.table_name}`);
         await client.query(`DROP TABLE IF EXISTS ${schemaName}.${row.table_name} CASCADE`);
       }
     };
