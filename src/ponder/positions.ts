@@ -42,7 +42,7 @@ ponder.on(
       fee: event.args.fee,
       tickSpacing: Number(event.args.tickSpacing),
       createdAt: Number(event.block.timestamp),
-    });
+    }).onConflictDoNothing();
 
     const token0Data = await context.db.find(token, {
       id: getAddress(event.args.token0).toLowerCase(),
@@ -120,7 +120,7 @@ ponder.on(
         tickUpper: Number(mintArgs.tickUpper),
         amount0: mintArgs.amount0,
         amount1: mintArgs.amount1,
-      });
+      }).onConflictDoNothing();
     }
   }
 );

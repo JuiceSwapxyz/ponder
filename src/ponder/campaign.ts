@@ -94,7 +94,7 @@ async function processCampaignSwap(event: any, context: any, poolAddress: string
       methodSignature: String(event?.transaction?.input || "0x").slice(0, 10),
       isCampaignRelevant: true,
       campaignTaskId: taskId,
-    });
+    }).onConflictDoNothing();
 
     // Record task completion (prevent duplicates)
     const completionId = `${chainId}:${walletAddress.toLowerCase()}:${taskId}`;

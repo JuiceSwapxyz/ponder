@@ -98,7 +98,7 @@ ponder.on(
       tick: event.args.tick,
       liquidity: event.args.liquidity,
       sqrtPriceX96: event.args.sqrtPriceX96,
-    });
+    }).onConflictDoNothing();
 
     await updatePoolStat({
       context,
@@ -133,7 +133,7 @@ ponder.on(
         amountIn: amountIn,
         amountOut: amountOut,
         swapperAddress: getAddress(event.transaction.from),
-      });
+      }).onConflictDoNothing();
 
       await updateTokenStat({
         context,
