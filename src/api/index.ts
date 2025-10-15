@@ -729,6 +729,11 @@ app.get("/api/sync-status", async (c: Context) => {
       if (!rpcUrl) {
         throw new Error('CITREA_RPC_URL environment variable is required');
       }
+
+      // Add 10 second timeout to RPC call
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(rpcUrl, {
         method: "POST",
         headers: {
@@ -739,8 +744,11 @@ app.get("/api/sync-status", async (c: Context) => {
           method: "eth_blockNumber",
           params: [],
           id: 1
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json() as { result?: string };

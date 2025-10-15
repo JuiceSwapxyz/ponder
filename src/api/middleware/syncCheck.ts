@@ -14,7 +14,7 @@ const CACHE_TTL = 5000; // 5 seconds cache
 
 /**
  * Get current sync status from database
- * Returns true if Ponder is synced (within 10 blocks of chain tip)
+ * Returns true if Ponder is synced (within 100 blocks of chain tip)
  */
 async function getSyncStatus(): Promise<boolean> {
   // Return cached status if still valid
@@ -42,6 +42,10 @@ async function getSyncStatus(): Promise<boolean> {
         throw new Error('CITREA_RPC_URL not configured');
       }
 
+      // Add 10 second timeout to RPC call
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(rpcUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -50,8 +54,11 @@ async function getSyncStatus(): Promise<boolean> {
           method: "eth_blockNumber",
           params: [],
           id: 1
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json() as { result?: string };
