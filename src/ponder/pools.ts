@@ -1,6 +1,7 @@
 // @ts-ignore
 import { getIdByTemporalFrame, TEMPORAL_FRAMES } from "@/utils/timestamps";
 import {
+  blockProgress,
   pool,
   poolActivity,
   poolStat,
@@ -149,5 +150,22 @@ ponder.on(
         amount: abs(amountOut),
       });
     }
+
+    // Update block progress
+    const lastUpdatedAt = BigInt(Math.floor(Date.now() / 1000));
+    await context.db
+      .insert(blockProgress)
+      .values({
+        id: `blockProgress`,
+        chainId: 5115,
+        blockNumber: event.block.number,
+        blockTimestamp: event.block.timestamp,
+        lastUpdatedAt,
+      })
+      .onConflictDoUpdate(() => ({
+        blockNumber: event.block.number,
+        blockTimestamp: event.block.timestamp,
+        lastUpdatedAt,
+      }));
   }
 );
