@@ -61,7 +61,7 @@ ponder.on(
           decimals: token0DataOnchain.decimals,
           name: token0DataOnchain.name,
         })
-        .onConflictDoUpdate({});
+        .onConflictDoNothing();
     }
 
     const token1Data = await context.db.find(token, {
@@ -81,7 +81,7 @@ ponder.on(
           decimals: token1DataOnchain.decimals,
           name: token1DataOnchain.name,
         })
-        .onConflictDoUpdate({});
+        .onConflictDoNothing();
     }
   }
 );
