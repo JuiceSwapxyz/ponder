@@ -34,7 +34,7 @@ ponder.on(
   async ({ event, context }: { event: any; context: any }) => {
     // UniswapV3Factory:PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)
     await context.db.insert(pool).values({
-      id: `${event.transaction.hash}-${event.logIndex}`,
+      id: getAddress(event.args.pool),
       chainId: 5115,
       address: getAddress(event.args.pool),
       token0: getAddress(event.args.token0),
@@ -42,7 +42,7 @@ ponder.on(
       fee: event.args.fee,
       tickSpacing: Number(event.args.tickSpacing),
       createdAt: Number(event.block.timestamp),
-    });
+    }).onConflictDoNothing();
 
     const token0Data = await context.db.find(token, {
       id: getAddress(event.args.token0).toLowerCase(),
@@ -61,7 +61,7 @@ ponder.on(
           decimals: token0DataOnchain.decimals,
           name: token0DataOnchain.name,
         })
-        .onConflictDoUpdate({});
+        .onConflictDoNothing();
     }
 
     const token1Data = await context.db.find(token, {
@@ -81,7 +81,7 @@ ponder.on(
           decimals: token1DataOnchain.decimals,
           name: token1DataOnchain.name,
         })
-        .onConflictDoUpdate({});
+        .onConflictDoNothing();
     }
   }
 );
@@ -103,6 +103,11 @@ ponder.on(
       (log: any) => log.topics[0] === uniswapV3PoolMintEventTopic
     );
 
+    if (!poolMintEvent) {
+      console.warn("No Mint event found in transaction logs");
+      return;
+    }
+
     const poolMintEventDecoded = decodeEventLog({
       abi: UniswapV3PoolAbi,
       data: poolMintEvent.data,
@@ -112,7 +117,7 @@ ponder.on(
     if (poolMintEventDecoded.eventName === "Mint") {
       const mintArgs = poolMintEventDecoded.args as any;
       await context.db.insert(position).values({
-        id: `${event.transaction.hash}-${event.logIndex}`,
+        id: event.id,
         owner: getAddress(event.args.to),
         poolAddress: getAddress(poolMintEvent.address),
         tokenId: event.args.tokenId.toString(),
@@ -120,7 +125,7 @@ ponder.on(
         tickUpper: Number(mintArgs.tickUpper),
         amount0: mintArgs.amount0,
         amount1: mintArgs.amount1,
-      });
+      }).onConflictDoNothing();
     }
   }
 );

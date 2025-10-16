@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: [develop]
   workflow_dispatch:
-    inputs:
-      reset_schema:
-        description: 'Create new schema version (resets database)'
-        required: false
-        default: false
-        type: boolean
 
 env:
   NODE_VERSION: '20'
@@ -65,12 +59,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ${{ env.DOCKER_TAGS }}
+          build-args: |
+            COMMIT_HASH=${{ steps.sha.outputs.short }}
 
   deploy:
     name: Deploy to DEV
@@ -88,26 +88,31 @@ jobs:
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            echo "Updating container app${{ inputs.reset_schema == true && ' (with schema reset)' || '' }}"
-
             CURRENT_REVISION=$(az containerapp revision list \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --query "[?properties.active].name" \
               --output tsv | head -1)
-            
-            echo "CURRENT_REVISION=$CURRENT_REVISION" >> $GITHUB_ENV
-            
+
+            echo "Current active revision: $CURRENT_REVISION"
+
             az containerapp update \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --image ${{ env.DOCKER_TAGS }} \
-              --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
+              --min-replicas 1 \
+              --max-replicas 1 \
+              --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}
 
-            az containerapp revision deactivate \
-              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-              --name ${{ env.AZURE_CONTAINER_APP }} \
-              --revision $CURRENT_REVISION
+            if [ -n "$CURRENT_REVISION" ]; then
+              echo "Deactivating previous revision: $CURRENT_REVISION"
+              az containerapp revision deactivate \
+                --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+                --name ${{ env.AZURE_CONTAINER_APP }} \
+                --revision $CURRENT_REVISION
+            else
+              echo "No previous revision to deactivate"
+            fi
 
       - name: Logout from Azure
         run: |

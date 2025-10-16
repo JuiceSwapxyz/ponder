@@ -1,2 +1,2 @@
 # ponder
-Citrea Testnet Ponder for JuiceSwap
+Citrea Testnet Ponder for JuiceSwap.

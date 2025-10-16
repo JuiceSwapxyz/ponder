@@ -5,7 +5,7 @@ import { db } from "ponder:api";
 // @ts-ignore
 import schema from "ponder:schema";
 // @ts-ignore
-import { taskCompletion, swap, pool, position } from "ponder:schema";
+import { taskCompletion, nftClaim, swap, pool, position } from "ponder:schema";
 import { eq, and, desc, count, gt } from "drizzle-orm";
 
 import { graphql } from "ponder"; // @ts-ignore
@@ -14,6 +14,11 @@ import { graphql } from "ponder"; // @ts-ignore
 import positions from "./controllers/positions";
 import pools from "./controllers/pools";
 import tokens from "./controllers/tokens";
+import exploreStats from "./controllers/exploreStats";
+import { blockProgress } from "ponder.schema";
+
+// Import middleware
+import { syncCheckMiddleware } from "./middleware/syncCheck";
 
 
 const app = new Hono();
@@ -37,12 +42,17 @@ app.use('/*', cors({
   allowHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Apply sync check middleware to all routes (whitelisted paths are excluded in middleware)
+app.use('/*', syncCheckMiddleware);
+
 app.use("/graphql", graphql({ db, schema })); 
 
 // Mount API controllers
 app.route("/positions", positions);
 app.route("/pools", pools);
 app.route("/tokens", tokens);
+app.route("/exploreStats", exploreStats);
+
 
 // Campaign Progress API Endpoint (GET with query params)
 app.get("/campaign/progress", async (c) => {
@@ -122,6 +132,23 @@ app.get("/campaign/progress", async (c) => {
     const totalTasks = allTasks.length;
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
+    // Query NFT claim status
+    let nftClaimData = null;
+    try {
+      const nftClaims = await db
+        .select()
+        .from(nftClaim)
+        .where(and(
+          eq(nftClaim.walletAddress, normalizedAddress),
+          eq(nftClaim.chainId, Number(chainId))
+        ))
+        .limit(1);
+
+      nftClaimData = nftClaims.length > 0 ? nftClaims[0] : null;
+    } catch (dbError) {
+      console.warn(`NFT claim query failed for ${normalizedAddress}:`, dbError);
+    }
+
     // Build response
     const response = {
       walletAddress: String(walletAddress),
@@ -130,8 +157,8 @@ app.get("/campaign/progress", async (c) => {
       totalTasks: totalTasks,
       completedTasks: completedTasks,
       progress: Number(progress.toFixed(2)),
-      nftClaimed: false, // Not implemented yet
-      claimTxHash: null
+      nftClaimed: !!nftClaimData,
+      claimTxHash: nftClaimData?.txHash || null
     };
 
 
@@ -221,6 +248,23 @@ app.post("/campaign/progress", async (c) => {
     const totalTasks = allTasks.length;
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
+    // Query NFT claim status
+    let nftClaimData = null;
+    try {
+      const nftClaims = await db
+        .select()
+        .from(nftClaim)
+        .where(and(
+          eq(nftClaim.walletAddress, normalizedAddress),
+          eq(nftClaim.chainId, Number(chainId))
+        ))
+        .limit(1);
+
+      nftClaimData = nftClaims.length > 0 ? nftClaims[0] : null;
+    } catch (dbError) {
+      console.warn(`NFT claim query failed for ${normalizedAddress}:`, dbError);
+    }
+
     // Build response
     const response = {
       walletAddress: walletAddress,
@@ -229,8 +273,8 @@ app.post("/campaign/progress", async (c) => {
       totalTasks: totalTasks,
       completedTasks: completedTasks,
       progress: Number(progress.toFixed(2)),
-      nftClaimed: false, // Not implemented yet
-      claimTxHash: null
+      nftClaimed: !!nftClaimData,
+      claimTxHash: nftClaimData?.txHash || null
     };
 
 
@@ -264,13 +308,11 @@ app.get("/campaign/addresses", async (c: Context) => {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
     }
 
-    // Get all unique wallet addresses from taskCompletion table
     const allCompletions = await db
       .select()
       .from(taskCompletion)
       .where(eq(taskCompletion.chainId, Number(chainId)));
 
-    // Group by wallet address and calculate progress
     const addressMap = new Map<string, any>();
 
     for (const completion of allCompletions) {
@@ -374,7 +416,7 @@ app.get("/campaign/stats", async (c: Context) => {
 app.get("/campaign/daily-growth", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
-    const days = parseInt(c.req.query('days') || '30'); // Last 30 days by default
+    const days = parseInt(c.req.query('days') || '30');
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -406,14 +448,12 @@ app.get("/campaign/daily-growth", async (c: Context) => {
       const dayData = dailyData.get(date)!;
       const userKey = completion.walletAddress.toLowerCase();
 
-      // Check if this is user's first activity
       if (!allUsers.has(userKey)) {
         dayData.newUsers.add(userKey);
         allUsers.add(userKey);
       }
     }
 
-    // Convert to array and calculate cumulative
     const result = [];
     let cumulative = 0;
 
@@ -429,7 +469,6 @@ app.get("/campaign/daily-growth", async (c: Context) => {
       });
     }
 
-    // Limit to requested days
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     const filtered = result.filter(item => new Date(item.date) >= cutoffDate);
@@ -455,7 +494,7 @@ app.get("/campaign/daily-growth", async (c: Context) => {
 app.get("/campaign/hourly-activity", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
-    const hours = parseInt(c.req.query('hours') || '24'); // Last 24 hours by default
+    const hours = parseInt(c.req.query('hours') || '24');
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -463,7 +502,6 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
 
     const cutoffTime = Math.floor(Date.now() / 1000) - (hours * 3600);
 
-    // Get recent completions
     const recentCompletions = await db
       .select()
       .from(taskCompletion)
@@ -473,7 +511,6 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
       ))
       .orderBy(taskCompletion.completedAt);
 
-    // Group by hour
     const hourlyData = new Map<string, { hour: string; activities: number; uniqueUsers: Set<string> }>();
 
     for (const completion of recentCompletions) {
@@ -519,7 +556,6 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
   }
 });
 
-// Campaign hourly completion stats for historical tracking
 app.get("/campaign/hourly-completion-stats", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
@@ -529,7 +565,6 @@ app.get("/campaign/hourly-completion-stats", async (c: Context) => {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
     }
 
-    // Get all completions (we need full history to calculate cumulative stats per hour)
     const allCompletions = await db
       .select()
       .from(taskCompletion)
@@ -656,15 +691,13 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get latest indexed block and counts from database
     try {
-      // Get latest swap block number
-      const latestSwap = await db
+      const latestBlockProgress = await db
         .select()
-        .from(swap)
-        .orderBy(desc(swap.blockNumber))
+        .from(blockProgress)
         .limit(1);
 
-      if (latestSwap.length > 0) {
-        latestIndexedBlock = Number(latestSwap[0].blockNumber);
+      if (latestBlockProgress.length > 0) {
+        latestIndexedBlock = Number(latestBlockProgress[0].blockNumber);
       }
 
       // Get counts
@@ -682,7 +715,12 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get current block number from Citrea RPC
     try {
-      const rpcUrl = process.env.CITREA_RPC_URL || "http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085";
+      const rpcUrl = process.env.CITREA_RPC_URL ?? 'https://rpc.testnet.juiceswap.com/';
+
+      // Add 10 second timeout to RPC call
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(rpcUrl, {
         method: "POST",
         headers: {
@@ -693,8 +731,11 @@ app.get("/api/sync-status", async (c: Context) => {
           method: "eth_blockNumber",
           params: [],
           id: 1
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json() as { result?: string };
@@ -717,8 +758,30 @@ app.get("/api/sync-status", async (c: Context) => {
       : 0;
 
     const blocksBehind = Math.max(0, currentChainBlock - latestIndexedBlock);
-    const isSynced = blocksBehind <= 10; // Consider synced if within 10 blocks
+    const isSynced = blocksBehind <= 100; // Consider synced if within 100 blocks
 
+    // Return 503 Service Unavailable if still syncing
+    if (!isSynced) {
+      return c.json({
+        status: "SYNCING",
+        timestamp: new Date().toISOString(),
+        sync: {
+          latestIndexedBlock,
+          currentChainBlock,
+          blocksBehind,
+          syncPercentage: Number(syncPercentage.toFixed(2)),
+          status: "syncing"
+        },
+        stats: {
+          swaps: swapCount,
+          pools: poolCount,
+          positions: positionCount
+        },
+        message: "Indexer is currently syncing. Please retry in a few moments."
+      }, 503);
+    }
+
+    // Return 200 OK if synced
     return c.json({
       status: "OK",
       timestamp: new Date().toISOString(),
@@ -727,7 +790,7 @@ app.get("/api/sync-status", async (c: Context) => {
         currentChainBlock,
         blocksBehind,
         syncPercentage: Number(syncPercentage.toFixed(2)),
-        status: isSynced ? "synced" : "syncing"
+        status: "synced"
       },
       stats: {
         swaps: swapCount,

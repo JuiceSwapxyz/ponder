@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+ARG COMMIT_HASH=public
+ENV COMMIT_HASH=${COMMIT_HASH}
+
 WORKDIR /app
 
 # Copy package files
@@ -17,5 +20,5 @@ RUN npm run build
 # Expose port
 EXPOSE 42069
 
-# Start with schema management then ponder
-CMD ["sh", "-c", "node schema-manager.js && npm start"]
+# Start ponder
+CMD ["sh", "-c", "npx ponder start --schema schema-${COMMIT_HASH}"]

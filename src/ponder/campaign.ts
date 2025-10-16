@@ -58,14 +58,13 @@ async function processCampaignSwap(event: any, context: any, poolAddress: string
     const recipient = event?.args?.recipient;
     const blockNumber = event?.block?.number;
     const blockTimestamp = event?.block?.timestamp;
-    const logIndex = event?.log?.logIndex;
 
-    if (!txHash || !recipient) {
+    if (!txHash || !recipient || !event?.id) {
       console.warn(`Missing required data for ${symbol} - skipping campaign processing`);
       return;
     }
 
-    const uniqueId = `${txHash}-${logIndex || 0}`;
+    const uniqueId = event.id;
     const walletAddress = safeGetAddress(recipient);
     const chainId = 5115;
 
@@ -94,7 +93,7 @@ async function processCampaignSwap(event: any, context: any, poolAddress: string
       methodSignature: String(event?.transaction?.input || "0x").slice(0, 10),
       isCampaignRelevant: true,
       campaignTaskId: taskId,
-    });
+    }).onConflictDoNothing();
 
     // Record task completion (prevent duplicates)
     const completionId = `${chainId}:${walletAddress.toLowerCase()}:${taskId}`;

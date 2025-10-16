@@ -4,7 +4,11 @@ import axios from 'axios';
 const app = express();
 app.use(express.json());
 
-const CITREA_RPC = 'http://vm-dfx-node-prd.westeurope.cloudapp.azure.com:8085';
+const CITREA_RPC = process.env.CITREA_RPC_URL ?? 'https://rpc.testnet.juiceswap.com/';
+
+if (!CITREA_RPC) {
+  console.warn('CITREA_RPC_URL not set, using default: https://rpc.testnet.juiceswap.com/');
+}
 
 app.post('/', async (req, res) => {
   try {
