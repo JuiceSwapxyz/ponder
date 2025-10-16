@@ -50,7 +50,7 @@ async function getSyncStatus(): Promise<boolean> {
       if (response.ok) {
         const data = await response.json() as { result?: string };
         if (data.result) {
-          currentChainBlock = parseInt(data.result, 16);
+          currentChainBlock = Number.parseInt(data.result, 16);
         }
       }
     } catch (rpcError) {
