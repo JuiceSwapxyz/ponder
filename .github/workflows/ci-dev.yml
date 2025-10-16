@@ -79,6 +79,33 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     environment: development
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate schema version
+        id: schema_version
+        run: |
+          if [ ! -f ponder.schema.ts ]; then
+            echo "ERROR: ponder.schema.ts not found!"
+            exit 1
+          fi
+
+          # Compute SHA256 hash of schema file (first 12 chars for readability)
+          SCHEMA_HASH=$(sha256sum ponder.schema.ts | cut -c1-12)
+          echo "Schema hash: $SCHEMA_HASH"
+
+          # Use manual override if reset_schema requested, otherwise use hash
+          if [ "${{ inputs.reset_schema }}" == "true" ]; then
+            VERSION="manual-${{ github.run_number }}"
+            echo "Using manual reset version: $VERSION"
+          else
+            VERSION="auto-$SCHEMA_HASH"
+            echo "Using automatic version: $VERSION"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Final PONDER_SCHEMA_VERSION: $VERSION"
+
       - name: Log in to Azure
         uses: azure/login@v2
         with:
@@ -88,7 +115,8 @@ jobs:
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            echo "Updating container app${{ inputs.reset_schema == true && ' (with schema reset)' || '' }}"
+            VERSION="${{ steps.schema_version.outputs.version }}"
+            echo "Updating container app with schema version: $VERSION"
 
             CURRENT_REVISION=$(az containerapp revision list \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
@@ -102,7 +130,7 @@ jobs:
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --image ${{ env.DOCKER_TAGS }} \
-              --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
+              --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }} PONDER_SCHEMA_VERSION=$VERSION
 
             if [ -n "$CURRENT_REVISION" ]; then
               echo "Deactivating previous revision: $CURRENT_REVISION"

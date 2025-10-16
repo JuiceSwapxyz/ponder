@@ -52,7 +52,8 @@ async function storeSchemaVersion(database, schema, version) {
 
     console.log(`Stored schema version ${version}`);
   } catch (error) {
-    console.warn("Failed to store schema version:", error.message);
+    console.error("Failed to store schema version:", error.message);
+    throw error;
   }
 }
 
@@ -88,36 +89,39 @@ async function performSchemaReset(database, schema) {
 
 async function manageSchemaVersion() {
   const database = process.env.DATABASE_URL;
-  const schema = process.env.DATABASE_SCHEMA;
+  const schema = process.env.DATABASE_SCHEMA || "public";
+  const requestedVersion = process.env.PONDER_SCHEMA_VERSION;
 
-  if (!database || !schema) {
-    console.error("DATABASE_URL or DATABASE_SCHEMA not set");
+  if (!database) {
+    console.error("DATABASE_URL is required but not set");
     process.exit(1);
   }
 
-  const requestedVersion = process.env.PONDER_SCHEMA_VERSION;
-
   if (!requestedVersion) {
-    console.log("No schema version specified, skipping schema management");
-    return;
+    console.error("PONDER_SCHEMA_VERSION is required but not set");
+    process.exit(1);
   }
 
-  const currentStoredVersion = await getStoredSchemaVersion(database, schema);
+  try {
+    const currentStoredVersion = await getStoredSchemaVersion(database, schema);
 
-  if (currentStoredVersion) {
-    if (requestedVersion === currentStoredVersion) {
-      console.log("Schema version unchanged, no reset needed");
-      return;
+    if (currentStoredVersion) {
+      if (requestedVersion === currentStoredVersion) {
+        console.log("Schema version unchanged, no reset needed");
+        return;
+      }
+
+      console.log("Schema version changed, reset required");
+    } else {
+      console.log("No stored schema version found, reset required");
     }
 
-    console.log("Schema version changed, reset required");
-  } else {
-    console.log("No stored schema version found, reset required");
+    await performSchemaReset(database, schema);
+    await storeSchemaVersion(database, schema, requestedVersion);
+  } catch (error) {
+    console.error("Schema management failed:", error.message);
+    process.exit(1);
   }
-
-  await performSchemaReset(database, schema);
-
-  await storeSchemaVersion(database, schema, requestedVersion);
 }
 
 manageSchemaVersion();
