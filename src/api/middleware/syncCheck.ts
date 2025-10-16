@@ -28,10 +28,7 @@ async function getSyncStatus(): Promise<boolean> {
 
     let currentChainBlock = 0;
     try {
-      const rpcUrl = process.env.CITREA_RPC_URL;
-      if (!rpcUrl) {
-        throw new Error('CITREA_RPC_URL not configured');
-      }
+      const rpcUrl = process.env.CITREA_RPC_URL ?? "https://rpc.testnet.juiceswap.com/";
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);

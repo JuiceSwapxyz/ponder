@@ -4,10 +4,10 @@ import axios from 'axios';
 const app = express();
 app.use(express.json());
 
-const CITREA_RPC = process.env.CITREA_RPC_URL;
+const CITREA_RPC = process.env.CITREA_RPC_URL ?? 'https://rpc.testnet.juiceswap.com/';
 
 if (!CITREA_RPC) {
-  throw new Error('CITREA_RPC_URL environment variable is required');
+  console.warn('CITREA_RPC_URL not set, using default: https://rpc.testnet.juiceswap.com/');
 }
 
 app.post('/', async (req, res) => {
