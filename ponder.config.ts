@@ -11,7 +11,7 @@ export default createConfig({
     // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL!), {
+      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "https://rpc.testnet.juiceswap.com/"), {
         requestsPerSecond: 40
       }),
     },

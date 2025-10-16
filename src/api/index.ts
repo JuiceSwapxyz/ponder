@@ -724,10 +724,7 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get current block number from Citrea RPC
     try {
-      const rpcUrl = process.env.CITREA_RPC_URL;
-      if (!rpcUrl) {
-        throw new Error('CITREA_RPC_URL environment variable is required');
-      }
+      const rpcUrl = process.env.CITREA_RPC_URL ?? 'https://rpc.testnet.juiceswap.com/';
 
       // Add 10 second timeout to RPC call
       const controller = new AbortController();
