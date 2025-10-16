@@ -87,6 +87,14 @@ async function performSchemaReset(database, schema) {
   }
 }
 
+async function waitForLock(client, lockId) {
+  await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+}
+
+async function releaseLock(client, lockId) {
+  await client.query('SELECT pg_advisory_unlock($1)', [lockId]);
+}
+
 async function manageSchemaVersion() {
   const database = process.env.DATABASE_URL;
   const schema = process.env.DATABASE_SCHEMA || "public";
@@ -102,15 +110,26 @@ async function manageSchemaVersion() {
     process.exit(1);
   }
 
+  const LOCK_ID = 1234567890;
+  const lockClient = new Client({ connectionString: database });
+
   try {
+    await lockClient.connect();
+
+    // All instances wait for lock (first gets it immediately, others wait)
+    await waitForLock(lockClient, LOCK_ID);
+
+    // Now we have lock - check if work needs to be done
     const currentStoredVersion = await getStoredSchemaVersion(database, schema);
 
-    if (currentStoredVersion) {
-      if (requestedVersion === currentStoredVersion) {
-        console.log("Schema version unchanged, no reset needed");
-        return;
-      }
+    if (currentStoredVersion === requestedVersion) {
+      console.log("Schema version unchanged, no reset needed");
+      await releaseLock(lockClient, LOCK_ID);
+      await lockClient.end();
+      return;
+    }
 
+    if (currentStoredVersion) {
       console.log("Schema version changed, reset required");
     } else {
       console.log("No stored schema version found, reset required");
@@ -118,8 +137,17 @@ async function manageSchemaVersion() {
 
     await performSchemaReset(database, schema);
     await storeSchemaVersion(database, schema, requestedVersion);
+
+    await releaseLock(lockClient, LOCK_ID);
+    await lockClient.end();
   } catch (error) {
     console.error("Schema management failed:", error.message);
+    try {
+      await releaseLock(lockClient, LOCK_ID);
+      await lockClient.end();
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
     process.exit(1);
   }
 }

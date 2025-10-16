@@ -129,6 +129,8 @@ jobs:
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --image ${{ env.DOCKER_TAGS }} \
+              --min-replicas 1 \
+              --max-replicas 1 \
               --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }} PONDER_SCHEMA_VERSION=$VERSION
 
             if [ -n "$CURRENT_REVISION" ]; then
