@@ -17,5 +17,5 @@ RUN npm run build
 # Expose port
 EXPOSE 42069
 
-# Start with schema management then ponder
-CMD ["sh", "-c", "node schema-manager.js && npm start"]
+# Start ponder
+CMD ["npm", "start"]
