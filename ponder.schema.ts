@@ -52,16 +52,6 @@ export const nftClaim = onchainTable("nft_claim", (t) => ({
   blockNumber: t.bigint().notNull(),
 }));
 
-export const nftClaimDuplicate = onchainTable("nft_claim_duplicate", (t) => ({
-  id: t.text().primaryKey(), // Format: {chainId}:{walletAddress}
-  walletAddress: t.hex().notNull(),
-  chainId: t.integer().notNull(),
-  tokenId: t.text().notNull(),
-  txHash: t.hex().notNull(),
-  claimedAt: t.bigint().notNull(),
-  blockNumber: t.bigint().notNull(),
-}));
-
 export const swap = onchainTable("swap", (t) => ({
   id: t.text().primaryKey(), // txHash
   txHash: t.hex().notNull(),

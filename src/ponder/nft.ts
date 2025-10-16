@@ -1,7 +1,7 @@
 // @ts-ignore
 import { ponder } from "ponder:registry";
 // @ts-ignore
-import { nftClaim, nftClaimDuplicate } from "ponder:schema";
+import { nftClaim } from "ponder:schema";
 import { getAddress } from "viem";
 
 // Utility function with error handling
@@ -49,17 +49,6 @@ ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any
 
     // Store NFT claim record
     await context.db.insert(nftClaim).values({
-      id: claimId,
-      walletAddress: walletAddress,
-      chainId: chainId,
-      tokenId: String(tokenId || "0"),
-      txHash: txHash,
-      claimedAt: safeBigInt(blockTimestamp),
-      blockNumber: safeBigInt(blockNumber),
-    }).onConflictDoNothing();
-
-    // Store NFT claim duplicate record
-    await context.db.insert(nftClaimDuplicate).values({
       id: claimId,
       walletAddress: walletAddress,
       chainId: chainId,
