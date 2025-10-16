@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+ARG COMMIT_HASH=public
+ENV COMMIT_HASH=${COMMIT_HASH}
+
 WORKDIR /app
 
 # Copy package files
@@ -18,4 +21,4 @@ RUN npm run build
 EXPOSE 42069
 
 # Start ponder
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx ponder start --schema schema-${COMMIT_HASH}"]
