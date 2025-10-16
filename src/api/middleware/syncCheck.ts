@@ -2,7 +2,7 @@ import { Context, Next } from "hono";
 // @ts-ignore
 import { db } from "ponder:api";
 // @ts-ignore
-import { blockProgress } from "ponder.schema";
+import { blockProgress } from "ponder:schema";
 
 let cachedSyncStatus: { isSynced: boolean; timestamp: number } | null = null;
 const CACHE_TTL = 5000;
