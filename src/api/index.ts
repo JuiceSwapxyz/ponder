@@ -15,6 +15,10 @@ import positions from "./controllers/positions";
 import pools from "./controllers/pools";
 import tokens from "./controllers/tokens";
 import exploreStats from "./controllers/exploreStats";
+import { blockProgress } from "ponder.schema";
+
+// Import middleware
+import { syncCheckMiddleware } from "./middleware/syncCheck";
 
 
 const app = new Hono();
@@ -37,6 +41,9 @@ app.use('/*', cors({
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Apply sync check middleware to all routes (whitelisted paths are excluded in middleware)
+app.use('/*', syncCheckMiddleware);
 
 app.use("/graphql", graphql({ db, schema })); 
 
@@ -693,15 +700,13 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get latest indexed block and counts from database
     try {
-      // Get latest swap block number
-      const latestSwap = await db
+      const latestBlockProgress = await db
         .select()
-        .from(swap)
-        .orderBy(desc(swap.blockNumber))
+        .from(blockProgress)
         .limit(1);
 
-      if (latestSwap.length > 0) {
-        latestIndexedBlock = Number(latestSwap[0].blockNumber);
+      if (latestBlockProgress.length > 0) {
+        latestIndexedBlock = Number(latestBlockProgress[0].blockNumber);
       }
 
       // Get counts
@@ -723,6 +728,11 @@ app.get("/api/sync-status", async (c: Context) => {
       if (!rpcUrl) {
         throw new Error('CITREA_RPC_URL environment variable is required');
       }
+
+      // Add 10 second timeout to RPC call
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(rpcUrl, {
         method: "POST",
         headers: {
@@ -733,8 +743,11 @@ app.get("/api/sync-status", async (c: Context) => {
           method: "eth_blockNumber",
           params: [],
           id: 1
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json() as { result?: string };
@@ -757,8 +770,30 @@ app.get("/api/sync-status", async (c: Context) => {
       : 0;
 
     const blocksBehind = Math.max(0, currentChainBlock - latestIndexedBlock);
-    const isSynced = blocksBehind <= 10; // Consider synced if within 10 blocks
+    const isSynced = blocksBehind <= 100; // Consider synced if within 100 blocks
 
+    // Return 503 Service Unavailable if still syncing
+    if (!isSynced) {
+      return c.json({
+        status: "SYNCING",
+        timestamp: new Date().toISOString(),
+        sync: {
+          latestIndexedBlock,
+          currentChainBlock,
+          blocksBehind,
+          syncPercentage: Number(syncPercentage.toFixed(2)),
+          status: "syncing"
+        },
+        stats: {
+          swaps: swapCount,
+          pools: poolCount,
+          positions: positionCount
+        },
+        message: "Indexer is currently syncing. Please retry in a few moments."
+      }, 503);
+    }
+
+    // Return 200 OK if synced
     return c.json({
       status: "OK",
       timestamp: new Date().toISOString(),
@@ -767,7 +802,7 @@ app.get("/api/sync-status", async (c: Context) => {
         currentChainBlock,
         blocksBehind,
         syncPercentage: Number(syncPercentage.toFixed(2)),
-        status: isSynced ? "synced" : "syncing"
+        status: "synced"
       },
       stats: {
         swaps: swapCount,

@@ -82,4 +82,11 @@ export default createConfig({
       })
     }
   },
+  blocks: {
+    blockProgress: {
+      chain: "citreaTestnet",
+      startBlock: 15455001,
+      interval: 100,
+    }
+  }
 });
