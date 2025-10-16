@@ -94,19 +94,24 @@ jobs:
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --query "[?properties.active].name" \
               --output tsv | head -1)
-            
-            echo "CURRENT_REVISION=$CURRENT_REVISION" >> $GITHUB_ENV
-            
+
+            echo "Current active revision: $CURRENT_REVISION"
+
             az containerapp update \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_CONTAINER_APP }} \
               --image ${{ env.DOCKER_TAGS }} \
               --set-env-vars DEPLOY_INFO=${{ env.DEPLOY_INFO }}${{ inputs.reset_schema == true && format(' PONDER_SCHEMA_VERSION={0}', github.run_number) || '' }}
 
-            az containerapp revision deactivate \
-              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-              --name ${{ env.AZURE_CONTAINER_APP }} \
-              --revision $CURRENT_REVISION
+            if [ -n "$CURRENT_REVISION" ]; then
+              echo "Deactivating previous revision: $CURRENT_REVISION"
+              az containerapp revision deactivate \
+                --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+                --name ${{ env.AZURE_CONTAINER_APP }} \
+                --revision $CURRENT_REVISION
+            else
+              echo "No previous revision to deactivate"
+            fi
 
       - name: Logout from Azure
         run: |
