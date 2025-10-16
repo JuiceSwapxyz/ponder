@@ -69,7 +69,6 @@ async function getSyncStatus(): Promise<boolean> {
     return isSynced;
   } catch (error) {
     console.error('Error checking sync status:', error);
-    // On error, assume not synced to be safe and prevent serving stale data
     return false;
   }
 }

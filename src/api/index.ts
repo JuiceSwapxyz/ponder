@@ -308,13 +308,11 @@ app.get("/campaign/addresses", async (c: Context) => {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
     }
 
-    // Get all unique wallet addresses from taskCompletion table
     const allCompletions = await db
       .select()
       .from(taskCompletion)
       .where(eq(taskCompletion.chainId, Number(chainId)));
 
-    // Group by wallet address and calculate progress
     const addressMap = new Map<string, any>();
 
     for (const completion of allCompletions) {
@@ -418,7 +416,7 @@ app.get("/campaign/stats", async (c: Context) => {
 app.get("/campaign/daily-growth", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
-    const days = parseInt(c.req.query('days') || '30'); // Last 30 days by default
+    const days = parseInt(c.req.query('days') || '30');
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -450,14 +448,12 @@ app.get("/campaign/daily-growth", async (c: Context) => {
       const dayData = dailyData.get(date)!;
       const userKey = completion.walletAddress.toLowerCase();
 
-      // Check if this is user's first activity
       if (!allUsers.has(userKey)) {
         dayData.newUsers.add(userKey);
         allUsers.add(userKey);
       }
     }
 
-    // Convert to array and calculate cumulative
     const result = [];
     let cumulative = 0;
 
@@ -473,7 +469,6 @@ app.get("/campaign/daily-growth", async (c: Context) => {
       });
     }
 
-    // Limit to requested days
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     const filtered = result.filter(item => new Date(item.date) >= cutoffDate);
@@ -499,7 +494,7 @@ app.get("/campaign/daily-growth", async (c: Context) => {
 app.get("/campaign/hourly-activity", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
-    const hours = parseInt(c.req.query('hours') || '24'); // Last 24 hours by default
+    const hours = parseInt(c.req.query('hours') || '24');
 
     if (Number(chainId) !== 5115) {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
@@ -507,7 +502,6 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
 
     const cutoffTime = Math.floor(Date.now() / 1000) - (hours * 3600);
 
-    // Get recent completions
     const recentCompletions = await db
       .select()
       .from(taskCompletion)
@@ -517,7 +511,6 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
       ))
       .orderBy(taskCompletion.completedAt);
 
-    // Group by hour
     const hourlyData = new Map<string, { hour: string; activities: number; uniqueUsers: Set<string> }>();
 
     for (const completion of recentCompletions) {
@@ -563,7 +556,6 @@ app.get("/campaign/hourly-activity", async (c: Context) => {
   }
 });
 
-// Campaign hourly completion stats for historical tracking
 app.get("/campaign/hourly-completion-stats", async (c: Context) => {
   try {
     const chainId = c.req.query('chainId') || '5115';
@@ -573,7 +565,6 @@ app.get("/campaign/hourly-completion-stats", async (c: Context) => {
       return c.json({ error: "Only Citrea testnet (chainId: 5115) supported" }, 400);
     }
 
-    // Get all completions (we need full history to calculate cumulative stats per hour)
     const allCompletions = await db
       .select()
       .from(taskCompletion)
