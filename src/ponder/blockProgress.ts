@@ -19,10 +19,10 @@ ponder.on(
         blockTimestamp,
         lastUpdatedAt,
       })
-      .onConflictDoUpdate({
+      .onConflictDoUpdate(() => ({
         blockNumber,
         blockTimestamp,
         lastUpdatedAt,
-      });
+      }));
   }
 );
