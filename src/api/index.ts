@@ -15,6 +15,7 @@ import positions from "./controllers/positions";
 import pools from "./controllers/pools";
 import tokens from "./controllers/tokens";
 import exploreStats from "./controllers/exploreStats";
+import { blockProgress } from "ponder.schema";
 
 // Import middleware
 import { syncCheckMiddleware } from "./middleware/syncCheck";
@@ -699,15 +700,13 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get latest indexed block and counts from database
     try {
-      // Get latest swap block number
-      const latestSwap = await db
+      const latestBlockProgress = await db
         .select()
-        .from(swap)
-        .orderBy(desc(swap.blockNumber))
+        .from(blockProgress)
         .limit(1);
 
-      if (latestSwap.length > 0) {
-        latestIndexedBlock = Number(latestSwap[0].blockNumber);
+      if (latestBlockProgress.length > 0) {
+        latestIndexedBlock = Number(latestBlockProgress[0].blockNumber);
       }
 
       // Get counts

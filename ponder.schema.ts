@@ -172,3 +172,11 @@ export const poolStat = onchainTable("poolStat", (t) => ({
   volume1: t.bigint().notNull(),
   type: t.text().notNull(), // "1h", "24h", "all-time"
 }));
+
+export const blockProgress = onchainTable("blockProgress", (t) => ({
+  id: t.text().primaryKey(),
+  chainId: t.integer().notNull(),
+  blockNumber: t.bigint().notNull(),
+  blockTimestamp: t.bigint().notNull(),
+  lastUpdatedAt: t.bigint().notNull(),
+}));
