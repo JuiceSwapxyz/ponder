@@ -1,6 +1,6 @@
 // @ts-ignore
 import { Context, Hono } from "hono";
-import { cache } from "hono/cache";
+import NodeCache from "node-cache";
 // @ts-ignore
 import { computeTxStats } from "./computeTxStats";
 import { computeTokenStats } from "./computeTokenStats";
@@ -8,23 +8,31 @@ import { computePoolStatsV3 } from "./computePoolStatsV3";
 
 const exploreStats = new Hono();
 
-exploreStats.use(
-  "*",
-  cache({
-    cacheName: "exploreStats",
-    cacheControl: "max-age=30",
-  })
-);
+const cache = new NodeCache({ 
+  stdTTL: 60,
+  checkperiod: 30,
+  useClones: false
+});
 
 exploreStats.get("/", async (c: Context) => {
   try {
+    const cacheKey = "exploreStats";
+    c.header('Cache-Control', 'public, max-age=60');
+    
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      c.header('X-Cache', 'HIT');
+      return c.json(cachedData);
+    }
+
+    c.header('X-Cache', 'MISS');
     const [transactionStats, tokenStats, poolStatsV3] = await Promise.all([
       computeTxStats(),
       computeTokenStats(),
       computePoolStatsV3(),
     ]);
 
-    return c.json({
+    const responseData = {
       stats: {
         transactionStats,
         tokenStats,
@@ -35,7 +43,10 @@ exploreStats.get("/", async (c: Context) => {
         poolStatsV2: [],
         poolStatsV4: [],
       },
-    });
+    };
+
+    cache.set(cacheKey, responseData);
+    return c.json(responseData);
   } catch (error) {
     console.error("Error fetching explore stats:", error);
     return c.json({ error: "Internal server error" }, 500);
