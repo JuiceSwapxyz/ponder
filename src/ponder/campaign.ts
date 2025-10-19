@@ -53,6 +53,12 @@ function safeNumber(value: any): number {
 // Safe campaign processing with comprehensive error handling
 async function processCampaignSwap(event: any, context: any, poolAddress: string, taskId: number, symbol: string) {
   try {
+    // Guard against missing transaction data
+    if (!event.transaction) {
+      console.warn(`Missing transaction data for ${symbol} - skipping campaign processing`);
+      return;
+    }
+
     // Extract event data safely
     const txHash = event?.transaction?.hash;
     const recipient = event?.args?.recipient;
