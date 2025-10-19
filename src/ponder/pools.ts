@@ -85,7 +85,13 @@ const updatePoolStat = async ({
 ponder.on(
   "UniswapV3Pool:Swap",
   async ({ event, context }: { event: any; context: any }) => {
-    await context.db.insert(poolActivity).values({
+    try {
+      if (!event.transaction) {
+        console.warn("Missing transaction data for Swap event, skipping");
+        return;
+      }
+
+      await context.db.insert(poolActivity).values({
       id: event.id,
       poolAddress: getAddress(event.log.address),
       chainId: 5115,
@@ -151,21 +157,25 @@ ponder.on(
       });
     }
 
-    // Update block progress
-    const lastUpdatedAt = BigInt(Math.floor(Date.now() / 1000));
-    await context.db
-      .insert(blockProgress)
-      .values({
-        id: `blockProgress`,
-        chainId: 5115,
-        blockNumber: event.block.number,
-        blockTimestamp: event.block.timestamp,
-        lastUpdatedAt,
-      })
-      .onConflictDoUpdate(() => ({
-        blockNumber: event.block.number,
-        blockTimestamp: event.block.timestamp,
-        lastUpdatedAt,
-      }));
+      // Update block progress
+      const lastUpdatedAt = BigInt(Math.floor(Date.now() / 1000));
+      await context.db
+        .insert(blockProgress)
+        .values({
+          id: `blockProgress`,
+          chainId: 5115,
+          blockNumber: event.block.number,
+          blockTimestamp: event.block.timestamp,
+          lastUpdatedAt,
+        })
+        .onConflictDoUpdate(() => ({
+          blockNumber: event.block.number,
+          blockTimestamp: event.block.timestamp,
+          lastUpdatedAt,
+        }));
+    } catch (error) {
+      console.error("Error processing Swap event:", error);
+      // Don't rethrow to prevent Ponder's error formatter from accessing null transaction
+    }
   }
 );
