@@ -85,6 +85,11 @@ const updatePoolStat = async ({
 ponder.on(
   "UniswapV3Pool:Swap",
   async ({ event, context }: { event: any; context: any }) => {
+    if (!event.transaction) {
+      console.warn("Missing transaction data for Swap event, skipping");
+      return;
+    }
+
     await context.db.insert(poolActivity).values({
       id: event.id,
       poolAddress: getAddress(event.log.address),

@@ -91,6 +91,11 @@ ponder.on(
   async ({ event, context }: { event: any; context: any }) => {
     if (event.args.from !== zeroAddress) return; // Do no track positions that are not minted
 
+    if (!event.transaction?.hash) {
+      console.warn("Missing transaction data for Transfer event, skipping");
+      return;
+    }
+
     const txReceipt = await context.client.getTransactionReceipt({
       hash: event.transaction.hash,
     });
