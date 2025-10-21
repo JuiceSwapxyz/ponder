@@ -20,44 +20,13 @@ export default createConfig({
     // CITREA TESTNET - First Squeezer NFT Campaign
     FirstSqueezerNFT: {
       chain: "citreaTestnet",
-      address: "0xcF62B46fF36a6FcABf4C0056c535A0cA41E7c03b",
+      address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
       abi: FirstSqueezerNFTAbi as any,
       filter: {
         event: "NFTClaimed",
         args: {},
       } as any,
-      startBlock: 16280000,
-    },
-    // CITREA TESTNET - UniswapV3 Pool Contracts for Citrea bApps Campaign
-    CBTCNUSDPool_CitreaTestnet: {
-      chain: "citreaTestnet",
-      address: "0x6006797369E2A595D31Df4ab3691044038AAa7FE",
-      abi: UniswapV3PoolAbi as any,
-      filter: {
-        event: "Swap",
-        args: {},
-      } as any,
-      startBlock: 15805014,
-    },
-    CBTCcUSDPool_CitreaTestnet: {
-      chain: "citreaTestnet",
-      address: "0xA69De906B9A830Deb64edB97B2eb0848139306d2",
-      abi: UniswapV3PoolAbi as any,
-      filter: {
-        event: "Swap",
-        args: {},
-      } as any,
-      startBlock: 15615173,
-    },
-    CBTCUSDCPool_CitreaTestnet: {
-      chain: "citreaTestnet",
-      address: "0xD8C7604176475eB8D350bC1EE452dA4442637C09",
-      abi: UniswapV3PoolAbi as any,
-      filter: {
-        event: "Swap",
-        args: {},
-      } as any,
-      startBlock: 15804939,
+      startBlock: 17129355,
     },
     NonfungiblePositionManager: {
       chain: "citreaTestnet",

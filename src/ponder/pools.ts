@@ -13,6 +13,7 @@ import {
 import { ponder } from "ponder:registry";
 import { getAddress } from "viem";
 import { eq } from "ponder";
+import { CAMPAIGN_POOLS, processCampaignSwap } from "@/utils/campaign";
 
 const abs = (n: bigint) => n < 0n ? -n : n;
 
@@ -176,6 +177,13 @@ ponder.on(
     } catch (error) {
       console.error("Error processing Swap event:", error);
       // Don't rethrow to prevent Ponder's error formatter from accessing null transaction
+    }
+
+    // Campaign processing
+    const poolInfo = CAMPAIGN_POOLS[getAddress(event.log.address).toLowerCase()];
+
+    if (poolInfo) {
+      await processCampaignSwap(event, context, getAddress(event.log.address).toLowerCase(), poolInfo.taskId, poolInfo.symbol);
     }
   }
 );
