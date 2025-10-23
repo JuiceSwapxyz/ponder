@@ -46,7 +46,84 @@ app.use('/*', cors({
 // Apply sync check middleware to all routes (whitelisted paths are excluded in middleware)
 app.use('/*', syncCheckMiddleware);
 
-app.use("/graphql", graphql({ db, schema })); 
+app.use("/graphql", graphql({ db, schema }));
+
+// Root landing page
+app.get("/", (c: Context) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JuiceSwap Ponder</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(rgb(19, 19, 19) 0%, rgb(19, 19, 19) 100%);
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+      max-width: 800px;
+    }
+    .ascii-art {
+      font-size: 2rem;
+      line-height: 1.2;
+      white-space: pre;
+      margin-bottom: 3rem;
+      color: #F7911A;
+      text-shadow: 0 0 20px rgba(247, 145, 26, 0.3);
+      letter-spacing: 0.1em;
+    }
+    .links {
+      margin-top: 2rem;
+    }
+    .links a {
+      display: block;
+      color: #ffffff;
+      text-decoration: none;
+      margin: 1rem 0;
+      font-size: 1.2rem;
+      transition: all 0.3s ease;
+      padding: 0.5rem;
+      border-radius: 8px;
+    }
+    .links a:hover {
+      background: rgba(247, 145, 26, 0.1);
+      color: #F7911A;
+    }
+    @media (max-width: 768px) {
+      .ascii-art {
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="ascii-art">
+   ╦╦ ╦╦╔═╗╔═╗╔═╗╦ ╦╔═╗╔═╗  ╔═╗╔═╗╔╗╔╔╦╗╔═╗╦═╗
+   ║║ ║║║  ║╣ ╚═╗║║║╠═╣╠═╝  ╠═╝║ ║║║║ ║║║╣ ╠╦╝
+  ╚╝╚═╝╩╚═╝╚═╝╚═╝╚╩╝╩ ╩╩    ╩  ╚═╝╝╚╝═╩╝╚═╝╩╚═
+    </div>
+    <div class="links">
+      <a href="/graphql">→ GraphQL Playground</a>
+      <a href="/api/info">→ API Info</a>
+      <a href="/api/sync-status">→ Sync Status</a>
+      <a href="https://github.com/JuiceSwapxyz/ponder" target="_blank">→ GitHub</a>
+    </div>
+  </div>
+</body>
+</html>`);
+});
 
 // Mount API controllers
 app.route("/positions", positions);
