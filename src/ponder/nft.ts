@@ -1,8 +1,9 @@
 // @ts-ignore
 import { ponder } from "ponder:registry";
 // @ts-ignore
-import { nftClaim } from "ponder:schema";
+import { nftClaim, nftClaimStats } from "ponder:schema";
 import { getAddress } from "viem";
+import { eq } from "ponder";
 
 // Utility function with error handling
 function safeGetAddress(address: any): string {
@@ -58,8 +59,50 @@ ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any
       blockNumber: safeBigInt(blockNumber),
     }).onConflictDoNothing();
 
+    // Update aggregated statistics
+    await updateNftClaimStats(context, chainId, blockTimestamp);
+
   } catch (error) {
     console.error("Error processing NFT claim:", error);
     // Continue execution - don't throw to prevent system crash
   }
 });
+
+// Helper function to update NFT claim statistics
+async function updateNftClaimStats(context: any, chainId: number, timestamp: any) {
+  try {
+    // Get all NFT claims for this chain
+    const allClaims = await context.db.select({
+      walletAddress: nftClaim.walletAddress,
+    }).from(nftClaim).where(eq(nftClaim.chainId, chainId));
+
+    // Calculate stats
+    const totalClaims = allClaims.length;
+    const uniqueAddressesSet = new Set(
+      allClaims.map((claim: any) => claim.walletAddress.toLowerCase())
+    );
+    const uniqueAddresses = uniqueAddressesSet.size;
+    const claimingAddressesArray = Array.from(uniqueAddressesSet);
+
+    const statsId = String(chainId);
+
+    // Upsert stats
+    await context.db.insert(nftClaimStats).values({
+      id: statsId,
+      chainId: chainId,
+      totalClaims: totalClaims,
+      uniqueAddresses: uniqueAddresses,
+      claimingAddresses: JSON.stringify(claimingAddressesArray),
+      lastUpdated: safeBigInt(timestamp),
+    }).onConflictDoUpdate({
+      totalClaims: totalClaims,
+      uniqueAddresses: uniqueAddresses,
+      claimingAddresses: JSON.stringify(claimingAddressesArray),
+      lastUpdated: safeBigInt(timestamp),
+    });
+
+    console.log(`Updated NFT claim stats: ${totalClaims} total claims, ${uniqueAddresses} unique addresses`);
+  } catch (error) {
+    console.error("Error updating NFT claim stats:", error);
+  }
+}

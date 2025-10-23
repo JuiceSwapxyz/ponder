@@ -52,6 +52,18 @@ export const nftClaim = onchainTable("nft_claim", (t) => ({
   blockNumber: t.bigint().notNull(),
 }));
 
+// Aggregated NFT claim statistics for fast API queries
+// Updated automatically on each NFT claim event
+export const nftClaimStats = onchainTable("nft_claim_stats", (t) => ({
+  id: t.text().primaryKey(), // Format: {chainId}
+  chainId: t.integer().notNull(),
+  totalClaims: t.integer().notNull(),
+  uniqueAddresses: t.integer().notNull(),
+  // JSON array of all claiming addresses (lowercase) for cross-referencing with API
+  claimingAddresses: t.text().notNull(),
+  lastUpdated: t.bigint().notNull(),
+}));
+
 export const swap = onchainTable("swap", (t) => ({
   id: t.text().primaryKey(), // txHash
   txHash: t.hex().notNull(),
