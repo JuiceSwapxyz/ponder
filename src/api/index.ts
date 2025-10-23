@@ -46,7 +46,9 @@ app.use('/*', cors({
 // Apply sync check middleware to all routes (whitelisted paths are excluded in middleware)
 app.use('/*', syncCheckMiddleware);
 
-app.use("/graphql", graphql({ db, schema })); 
+const graphqlMiddleware = graphql({ db, schema });
+app.use("/graphql", graphqlMiddleware); 
+app.use("/playground", graphqlMiddleware); // Unconstrained by sync check
 
 // Mount API controllers
 app.route("/positions", positions);

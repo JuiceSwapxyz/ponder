@@ -82,8 +82,7 @@ export async function syncCheckMiddleware(c: Context, next: Next) {
     '/api/sync-status',
     '/api/info',
     '/campaign/health',
-    '/graphql',
-    '/exploreStats',
+    '/playground',
   ];
 
   const path = new URL(c.req.url).pathname;
