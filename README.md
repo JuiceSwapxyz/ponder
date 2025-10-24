@@ -1,2 +1,2 @@
 # ponder
-Citrea Testnet Ponder (indexer) for JuiceSwap.
+Citrea Testnet Ponder (indexer) for JuiceSwap
