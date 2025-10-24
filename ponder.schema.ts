@@ -52,6 +52,15 @@ export const nftClaim = onchainTable("nft_claim", (t) => ({
   blockNumber: t.bigint().notNull(),
 }));
 
+export const nftOwner = onchainTable("nft_owner", (t) => ({
+  id: t.text().primaryKey(),
+  owner: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  tokenId: t.text().notNull(),
+  contractAddress: t.hex().notNull(),
+  timestamp: t.bigint().notNull(),
+}));
+
 export const swap = onchainTable("swap", (t) => ({
   id: t.text().primaryKey(), // txHash
   txHash: t.hex().notNull(),

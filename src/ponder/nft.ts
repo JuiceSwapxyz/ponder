@@ -1,29 +1,9 @@
 // @ts-ignore
 import { ponder } from "ponder:registry";
 // @ts-ignore
-import { nftClaim } from "ponder:schema";
+import { nftClaim, nftOwner } from "ponder:schema";
 import { getAddress } from "viem";
-
-// Utility function with error handling
-function safeGetAddress(address: any): string {
-  try {
-    if (!address) return "0x0000000000000000000000000000000000000000";
-    return getAddress(String(address));
-  } catch (error) {
-    console.warn(`Invalid address: ${address}`, error);
-    return "0x0000000000000000000000000000000000000000";
-  }
-}
-
-function safeBigInt(value: any): bigint {
-  try {
-    if (value === null || value === undefined) return BigInt(0);
-    return BigInt(String(value));
-  } catch (error) {
-    console.warn(`Invalid BigInt: ${value}`, error);
-    return BigInt(0);
-  }
-}
+import { safeGetAddress, safeBigInt } from "../utils/helpers";
 
 // NFT Claimed Event Handler
 ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any; context: any }) => {
@@ -45,8 +25,6 @@ ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any
 
     const claimId = `${chainId}:${walletAddress.toLowerCase()}`;
 
-    console.log(`NFT Claimed: ${walletAddress} received token #${tokenId}`);
-
     // Store NFT claim record
     await context.db.insert(nftClaim).values({
       id: claimId,
@@ -58,8 +36,30 @@ ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any
       blockNumber: safeBigInt(blockNumber),
     }).onConflictDoNothing();
 
-  } catch (error) {
-    console.error("Error processing NFT claim:", error);
-    // Continue execution - don't throw to prevent system crash
+    } catch (error) {
+      console.error("Error processing NFT claim:", error);
+    }
   }
-});
+);
+
+ponder.on("FirstSqueezerNFT:Transfer", async ({ event, context }: { event: any; context: any }) => {
+  try {
+    const chainId = 5115;
+    const tokenId = event?.args?.tokenId;
+    const contractAddress = safeGetAddress(event?.log?.address);
+    
+    await context.db.insert(nftOwner).values({
+      id: `${chainId}-${tokenId}-${contractAddress}`,
+      owner: getAddress(event?.args?.to),
+      chainId: chainId,
+      tokenId: String(tokenId || "0"),
+      contractAddress,
+      timestamp: safeBigInt(event?.block?.timestamp),
+    }).onConflictDoUpdate({
+      owner: getAddress(event?.args?.to),
+      timestamp: safeBigInt(event?.block?.timestamp),
+    })
+  } catch (error) {
+    console.error("Error processing NFT transfer:", error);
+  }
+})
