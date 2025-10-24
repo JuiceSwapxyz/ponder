@@ -22,10 +22,6 @@ export default createConfig({
       chain: "citreaTestnet",
       address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
       abi: FirstSqueezerNFTAbi as any,
-      filter: {
-        event: "NFTClaimed",
-        args: {},
-      } as any,
       startBlock: 17129355,
     },
     NonfungiblePositionManager: {
