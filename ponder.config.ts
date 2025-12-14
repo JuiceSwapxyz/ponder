@@ -4,7 +4,13 @@ import { FirstSqueezerNFTAbi } from "./abis/FirstSqueezerNFT";
 import { citreaTransport } from "./citrea-transport-fix";
 import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager";
 import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
+import { TokenFactoryAbi } from "./abis/TokenFactory";
+import { BondingCurveTokenAbi } from "./abis/BondingCurveToken";
+import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
 import { parseAbiItem } from "viem";
+
+// Launchpad deployment block (Citrea Testnet)
+const LAUNCHPAD_START_BLOCK = 19372868;
 
 export default createConfig({
   chains: {
@@ -44,6 +50,23 @@ export default createConfig({
         address: "0x6832283eEA5a9A3C4384A5D9a06Db0ce6FE9C79E",
         event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
         parameter: "pool",
+      })
+    },
+    // CITREA TESTNET - Launchpad (Bonding Curve Token Factory)
+    TokenFactory: {
+      chain: "citreaTestnet",
+      address: LAUNCHPAD_ADDRESSES[5115].factory as `0x${string}`,
+      abi: TokenFactoryAbi as any,
+      startBlock: LAUNCHPAD_START_BLOCK,
+    },
+    BondingCurveToken: {
+      chain: "citreaTestnet",
+      abi: BondingCurveTokenAbi as any,
+      startBlock: LAUNCHPAD_START_BLOCK,
+      address: factory({
+        address: LAUNCHPAD_ADDRESSES[5115].factory as `0x${string}`,
+        event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient)'),
+        parameter: "token",
       })
     }
   },
