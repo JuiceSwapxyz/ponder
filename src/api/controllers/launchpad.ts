@@ -1,7 +1,7 @@
 /**
  * Launchpad API controller - endpoints for querying launchpad tokens and trades
  */
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, count } from "drizzle-orm";
 import { Context, Hono } from "hono";
 import { getAddress } from "viem";
 // @ts-ignore
@@ -73,7 +73,7 @@ launchpad.get("/tokens", async (c: Context) => {
 
     // Get total count for pagination
     const totalResult = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: count() })
       .from(launchpadToken)
       .where(whereClause);
 
@@ -149,7 +149,23 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
       .limit(limit)
       .offset(offset);
 
-    return c.json({ trades });
+    // Get total count for pagination
+    const totalResult = await db
+      .select({ count: count() })
+      .from(launchpadTrade)
+      .where(eq(launchpadTrade.tokenAddress, checksumAddress));
+
+    const total = totalResult[0]?.count || 0;
+
+    return c.json({
+      trades,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("[Launchpad API] Error fetching trades:", error);
     return c.json({ error: "Failed to fetch trades" }, 500);
@@ -162,16 +178,16 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
 launchpad.get("/stats", async (c: Context) => {
   try {
     const totalTokensResult = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: count() })
       .from(launchpadToken);
 
     const graduatedTokensResult = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: count() })
       .from(launchpadToken)
       .where(eq(launchpadToken.graduated, true));
 
     const activeTokensResult = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: count() })
       .from(launchpadToken)
       .where(and(
         eq(launchpadToken.graduated, false),
@@ -179,7 +195,7 @@ launchpad.get("/stats", async (c: Context) => {
       ));
 
     const graduatingTokensResult = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: count() })
       .from(launchpadToken)
       .where(and(
         eq(launchpadToken.graduated, false),
@@ -187,7 +203,7 @@ launchpad.get("/stats", async (c: Context) => {
       ));
 
     const totalTradesResult = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: count() })
       .from(launchpadTrade);
 
     const totalVolumeResult = await db

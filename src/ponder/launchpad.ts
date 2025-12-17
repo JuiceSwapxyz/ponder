@@ -4,14 +4,21 @@
 import { launchpadToken, launchpadTrade } from "ponder.schema";
 // @ts-ignore
 import { ponder } from "ponder:registry";
-import { getAddress } from "viem";
+import { safeGetAddress, safeBigInt } from "../utils/helpers";
 
 const CITREA_TESTNET_CHAIN_ID = 5115;
 
 // Index new token creation from TokenFactory
 ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; context: any }) => {
   try {
-    const tokenAddress = getAddress(event.args.token);
+    if (!event.transaction) {
+      console.warn("[Launchpad] Missing transaction data for TokenCreated event, skipping");
+      return;
+    }
+
+    const tokenAddress = safeGetAddress(event.args.token);
+    const creatorAddress = safeGetAddress(event.args.creator);
+    const baseAssetAddress = safeGetAddress(event.args.baseAsset);
 
     await context.db.insert(launchpadToken).values({
       id: tokenAddress,
@@ -19,10 +26,10 @@ ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; 
       chainId: CITREA_TESTNET_CHAIN_ID,
       name: event.args.name,
       symbol: event.args.symbol,
-      creator: getAddress(event.args.creator),
-      baseAsset: getAddress(event.args.baseAsset),
-      createdAt: event.block.timestamp,
-      createdAtBlock: event.block.number,
+      creator: creatorAddress,
+      baseAsset: baseAssetAddress,
+      createdAt: safeBigInt(event.block.timestamp),
+      createdAtBlock: safeBigInt(event.block.number),
       txHash: event.transaction.hash,
       graduated: false,
       canGraduate: false,
@@ -40,7 +47,13 @@ ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; 
 // Index buy trades from BondingCurveToken
 ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; context: any }) => {
   try {
-    const tokenAddress = getAddress(event.log.address);
+    if (!event.transaction) {
+      console.warn("[Launchpad] Missing transaction data for Buy event, skipping");
+      return;
+    }
+
+    const tokenAddress = safeGetAddress(event.log.address);
+    const traderAddress = safeGetAddress(event.args.buyer);
     const tradeId = `${event.transaction.hash}-${event.log.logIndex}`;
 
     // Insert trade record
@@ -48,12 +61,12 @@ ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; cont
       id: tradeId,
       tokenAddress,
       chainId: CITREA_TESTNET_CHAIN_ID,
-      trader: getAddress(event.args.buyer),
+      trader: traderAddress,
       isBuy: true,
       baseAmount: event.args.baseIn,
       tokenAmount: event.args.tokensOut,
-      timestamp: event.block.timestamp,
-      blockNumber: event.block.number,
+      timestamp: safeBigInt(event.block.timestamp),
+      blockNumber: safeBigInt(event.block.number),
       txHash: event.transaction.hash,
     }).onConflictDoNothing();
 
@@ -63,7 +76,7 @@ ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; cont
       .set((row: any) => ({
         totalBuys: row.totalBuys + 1,
         totalVolumeBase: row.totalVolumeBase + event.args.baseIn,
-        lastTradeAt: event.block.timestamp,
+        lastTradeAt: safeBigInt(event.block.timestamp),
       }));
   } catch (error) {
     console.error("[Launchpad] Error indexing Buy:", error);
@@ -73,7 +86,13 @@ ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; cont
 // Index sell trades from BondingCurveToken
 ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; context: any }) => {
   try {
-    const tokenAddress = getAddress(event.log.address);
+    if (!event.transaction) {
+      console.warn("[Launchpad] Missing transaction data for Sell event, skipping");
+      return;
+    }
+
+    const tokenAddress = safeGetAddress(event.log.address);
+    const traderAddress = safeGetAddress(event.args.seller);
     const tradeId = `${event.transaction.hash}-${event.log.logIndex}`;
 
     // Insert trade record
@@ -81,12 +100,12 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
       id: tradeId,
       tokenAddress,
       chainId: CITREA_TESTNET_CHAIN_ID,
-      trader: getAddress(event.args.seller),
+      trader: traderAddress,
       isBuy: false,
       baseAmount: event.args.baseOut,
       tokenAmount: event.args.tokensIn,
-      timestamp: event.block.timestamp,
-      blockNumber: event.block.number,
+      timestamp: safeBigInt(event.block.timestamp),
+      blockNumber: safeBigInt(event.block.number),
       txHash: event.transaction.hash,
     }).onConflictDoNothing();
 
@@ -96,7 +115,7 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
       .set((row: any) => ({
         totalSells: row.totalSells + 1,
         totalVolumeBase: row.totalVolumeBase + event.args.baseOut,
-        lastTradeAt: event.block.timestamp,
+        lastTradeAt: safeBigInt(event.block.timestamp),
       }));
   } catch (error) {
     console.error("[Launchpad] Error indexing Sell:", error);
@@ -106,18 +125,19 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
 // Index graduation event
 ponder.on("BondingCurveToken:Graduated", async ({ event, context }: { event: any; context: any }) => {
   try {
-    const tokenAddress = getAddress(event.log.address);
+    const tokenAddress = safeGetAddress(event.log.address);
+    const pairAddress = safeGetAddress(event.args.pair);
 
     await context.db
       .update(launchpadToken, { id: tokenAddress })
       .set({
         graduated: true,
         canGraduate: false,
-        v2Pair: getAddress(event.args.pair),
-        graduatedAt: event.block.timestamp,
+        v2Pair: pairAddress,
+        graduatedAt: safeBigInt(event.block.timestamp),
       });
 
-    console.log(`[Launchpad] Token graduated: ${tokenAddress} -> pair ${event.args.pair}`);
+    console.log(`[Launchpad] Token graduated: ${tokenAddress} -> pair ${pairAddress}`);
   } catch (error) {
     console.error("[Launchpad] Error indexing Graduated:", error);
   }
@@ -126,7 +146,7 @@ ponder.on("BondingCurveToken:Graduated", async ({ event, context }: { event: any
 // Index ready for graduation event
 ponder.on("BondingCurveToken:ReadyForGraduation", async ({ event, context }: { event: any; context: any }) => {
   try {
-    const tokenAddress = getAddress(event.log.address);
+    const tokenAddress = safeGetAddress(event.log.address);
 
     await context.db
       .update(launchpadToken, { id: tokenAddress })
