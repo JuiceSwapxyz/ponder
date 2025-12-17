@@ -229,3 +229,20 @@ export const launchpadTrade = onchainTable("launchpadTrade", (t) => ({
   blockNumber: t.bigint().notNull(),
   txHash: t.hex().notNull(),
 }));
+
+// V2 pools created when launchpad tokens graduate
+export const graduatedV2Pool = onchainTable("graduatedV2Pool", (t) => ({
+  id: t.text().primaryKey(), // pair address
+  pairAddress: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  token0: t.hex().notNull(),
+  token1: t.hex().notNull(),
+  launchpadTokenAddress: t.hex().notNull(), // link back to launchpad token
+  reserve0: t.bigint().notNull().default(0n),
+  reserve1: t.bigint().notNull().default(0n),
+  createdAt: t.bigint().notNull(),
+  createdAtBlock: t.bigint().notNull(),
+  txHash: t.hex().notNull(),
+  totalSwaps: t.integer().notNull().default(0),
+  lastSyncAt: t.bigint(),
+}));

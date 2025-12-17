@@ -1,7 +1,7 @@
 /**
  * Launchpad indexer - indexes TokenCreated, Buy, Sell, Graduated, ReadyForGraduation events
  */
-import { launchpadToken, launchpadTrade } from "ponder.schema";
+import { launchpadToken, launchpadTrade, graduatedV2Pool } from "ponder.schema";
 // @ts-ignore
 import { ponder } from "ponder:registry";
 import { safeGetAddress, safeBigInt } from "../utils/helpers";
@@ -125,9 +125,15 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
 // Index graduation event
 ponder.on("BondingCurveToken:Graduated", async ({ event, context }: { event: any; context: any }) => {
   try {
+    if (!event.transaction) {
+      console.warn("[Launchpad] Missing transaction data for Graduated event, skipping");
+      return;
+    }
+
     const tokenAddress = safeGetAddress(event.log.address);
     const pairAddress = safeGetAddress(event.args.pair);
 
+    // Update launchpad token record
     await context.db
       .update(launchpadToken, { id: tokenAddress })
       .set({
@@ -137,7 +143,38 @@ ponder.on("BondingCurveToken:Graduated", async ({ event, context }: { event: any
         graduatedAt: safeBigInt(event.block.timestamp),
       });
 
-    console.log(`[Launchpad] Token graduated: ${tokenAddress} -> pair ${pairAddress}`);
+    // Fetch the token to get its baseAsset
+    const tokenRecord = await context.db.find(launchpadToken, { id: tokenAddress });
+
+    if (tokenRecord) {
+      // Determine token0/token1 (V2 pairs sort by address - lower is token0)
+      const tokenAddrLower = tokenAddress.toLowerCase();
+      const baseAssetLower = tokenRecord.baseAsset.toLowerCase();
+      const isTokenToken0 = tokenAddrLower < baseAssetLower;
+
+      const token0 = isTokenToken0 ? tokenAddress : tokenRecord.baseAsset;
+      const token1 = isTokenToken0 ? tokenRecord.baseAsset : tokenAddress;
+
+      // Create graduated V2 pool record
+      await context.db.insert(graduatedV2Pool).values({
+        id: pairAddress,
+        pairAddress,
+        chainId: CITREA_TESTNET_CHAIN_ID,
+        token0,
+        token1,
+        launchpadTokenAddress: tokenAddress,
+        reserve0: 0n, // Will be read on-chain by the API
+        reserve1: 0n,
+        createdAt: safeBigInt(event.block.timestamp),
+        createdAtBlock: safeBigInt(event.block.number),
+        txHash: event.transaction.hash,
+        totalSwaps: 0,
+      }).onConflictDoNothing();
+
+      console.log(`[Launchpad] Token graduated: ${tokenAddress} -> V2 pair ${pairAddress} (token0: ${token0}, token1: ${token1})`);
+    } else {
+      console.warn(`[Launchpad] Could not find token record for graduated token: ${tokenAddress}`);
+    }
   } catch (error) {
     console.error("[Launchpad] Error indexing Graduated:", error);
   }
