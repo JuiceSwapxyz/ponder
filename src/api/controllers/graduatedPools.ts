@@ -2,7 +2,7 @@
  * Graduated Pools API controller - endpoints for querying V2 pools from graduated launchpad tokens
  * Used by the router to find available V2 pools for routing
  */
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, replaceBigInts } from "ponder";
 import { Context, Hono } from "hono";
 import { getAddress } from "viem";
 // @ts-ignore
@@ -36,7 +36,7 @@ graduatedPools.get("/", async (c: Context) => {
       .leftJoin(launchpadToken, eq(graduatedV2Pool.launchpadTokenAddress, launchpadToken.address))
       .orderBy(desc(graduatedV2Pool.createdAt));
 
-    return c.json({ pools });
+    return c.json(replaceBigInts({ pools }, (v) => String(v)));
   } catch (error) {
     console.error("[GraduatedPools API] Error fetching pools:", error);
     return c.json({ error: "Failed to fetch graduated pools" }, 500);
@@ -65,7 +65,7 @@ graduatedPools.get("/:pairAddress", async (c: Context) => {
       return c.json({ error: "Pool not found" }, 404);
     }
 
-    return c.json({ pool: pools[0] });
+    return c.json(replaceBigInts({ pool: pools[0] }, (v) => String(v)));
   } catch (error) {
     console.error("[GraduatedPools API] Error fetching pool:", error);
     return c.json({ error: "Failed to fetch pool" }, 500);
@@ -94,7 +94,7 @@ graduatedPools.get("/by-token/:tokenAddress", async (c: Context) => {
       return c.json({ error: "No V2 pool found for this token" }, 404);
     }
 
-    return c.json({ pool: pools[0] });
+    return c.json(replaceBigInts({ pool: pools[0] }, (v) => String(v)));
   } catch (error) {
     console.error("[GraduatedPools API] Error fetching pool by token:", error);
     return c.json({ error: "Failed to fetch pool" }, 500);
