@@ -189,3 +189,60 @@ export const blockProgress = onchainTable("blockProgress", (t) => ({
   blockTimestamp: t.bigint().notNull(),
   lastUpdatedAt: t.bigint().notNull(),
 }));
+
+// ============ LAUNCHPAD SCHEMA ============
+
+export const launchpadToken = onchainTable("launchpadToken", (t) => ({
+  id: t.text().primaryKey(), // token address
+  address: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  name: t.text().notNull(),
+  symbol: t.text().notNull(),
+  creator: t.hex().notNull(),
+  baseAsset: t.hex().notNull(),
+  createdAt: t.bigint().notNull(),
+  createdAtBlock: t.bigint().notNull(),
+  txHash: t.hex().notNull(),
+
+  // State (updated on each trade/graduation)
+  graduated: t.boolean().notNull().default(false),
+  canGraduate: t.boolean().notNull().default(false),
+  v2Pair: t.hex(),
+  graduatedAt: t.bigint(),
+
+  // Stats (updated on trades)
+  totalBuys: t.integer().notNull().default(0),
+  totalSells: t.integer().notNull().default(0),
+  totalVolumeBase: t.bigint().notNull().default(0n),
+  lastTradeAt: t.bigint(),
+}));
+
+export const launchpadTrade = onchainTable("launchpadTrade", (t) => ({
+  id: t.text().primaryKey(), // txHash-logIndex
+  tokenAddress: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  trader: t.hex().notNull(),
+  isBuy: t.boolean().notNull(),
+  baseAmount: t.bigint().notNull(),
+  tokenAmount: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  txHash: t.hex().notNull(),
+}));
+
+// V2 pools created when launchpad tokens graduate
+export const graduatedV2Pool = onchainTable("graduatedV2Pool", (t) => ({
+  id: t.text().primaryKey(), // pair address
+  pairAddress: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  token0: t.hex().notNull(),
+  token1: t.hex().notNull(),
+  launchpadTokenAddress: t.hex().notNull(), // link back to launchpad token
+  reserve0: t.bigint().notNull().default(0n),
+  reserve1: t.bigint().notNull().default(0n),
+  createdAt: t.bigint().notNull(),
+  createdAtBlock: t.bigint().notNull(),
+  txHash: t.hex().notNull(),
+  totalSwaps: t.integer().notNull().default(0),
+  lastSyncAt: t.bigint(),
+}));
