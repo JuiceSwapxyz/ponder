@@ -1,7 +1,7 @@
 /**
  * Launchpad API controller - endpoints for querying launchpad tokens and trades
  */
-import { eq, desc, and, sql, count } from "drizzle-orm";
+import { eq, desc, and, sql, count, replaceBigInts } from "ponder";
 import { Context, Hono } from "hono";
 import { getAddress } from "viem";
 // @ts-ignore
@@ -79,7 +79,7 @@ launchpad.get("/tokens", async (c: Context) => {
 
     const total = totalResult[0]?.count || 0;
 
-    return c.json({
+    return c.json(replaceBigInts({
       tokens,
       pagination: {
         page,
@@ -87,7 +87,7 @@ launchpad.get("/tokens", async (c: Context) => {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    });
+    }, (v) => String(v)));
   } catch (error) {
     console.error("[Launchpad API] Error fetching tokens:", error);
     return c.json({ error: "Failed to fetch tokens" }, 500);
@@ -116,7 +116,7 @@ launchpad.get("/token/:address", async (c: Context) => {
       return c.json({ error: "Token not found" }, 404);
     }
 
-    return c.json({ token: tokens[0] });
+    return c.json(replaceBigInts({ token: tokens[0] }, (v) => String(v)));
   } catch (error) {
     console.error("[Launchpad API] Error fetching token:", error);
     return c.json({ error: "Failed to fetch token" }, 500);
@@ -157,7 +157,7 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
 
     const total = totalResult[0]?.count || 0;
 
-    return c.json({
+    return c.json(replaceBigInts({
       trades,
       pagination: {
         page,
@@ -165,7 +165,7 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    });
+    }, (v) => String(v)));
   } catch (error) {
     console.error("[Launchpad API] Error fetching trades:", error);
     return c.json({ error: "Failed to fetch trades" }, 500);
@@ -251,7 +251,7 @@ launchpad.get("/recent-trades", async (c: Context) => {
       .orderBy(desc(launchpadTrade.timestamp))
       .limit(limit);
 
-    return c.json({ trades });
+    return c.json(replaceBigInts({ trades }, (v) => String(v)));
   } catch (error) {
     console.error("[Launchpad API] Error fetching recent trades:", error);
     return c.json({ error: "Failed to fetch recent trades" }, 500);
