@@ -5,6 +5,7 @@ import NodeCache from "node-cache";
 import { computeTxStats } from "./computeTxStats";
 import { computeTokenStats } from "./computeTokenStats";
 import { computePoolStatsV3 } from "./computePoolStatsV3";
+import { computePoolStatsV2 } from "./computePoolStatsV2";
 
 const exploreStats = new Hono();
 
@@ -26,10 +27,11 @@ exploreStats.get("/", async (c: Context) => {
     }
 
     c.header('X-Cache', 'MISS');
-    const [transactionStats, tokenStats, poolStatsV3] = await Promise.all([
+    const [transactionStats, tokenStats, poolStatsV3, poolStatsV2] = await Promise.all([
       computeTxStats(),
       computeTokenStats(),
       computePoolStatsV3(),
+      computePoolStatsV2(),
     ]);
 
     const responseData = {
@@ -40,7 +42,7 @@ exploreStats.get("/", async (c: Context) => {
         dailyProtocolTvl: { v2: [], v3: [], v4: [] },
         historicalProtocolVolume: null,
         poolStats: [],
-        poolStatsV2: [],
+        poolStatsV2,
         poolStatsV4: [],
       },
     };

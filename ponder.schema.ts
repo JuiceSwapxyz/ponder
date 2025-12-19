@@ -215,6 +215,8 @@ export const launchpadToken = onchainTable("launchpadToken", (t) => ({
   totalSells: t.integer().notNull().default(0),
   totalVolumeBase: t.bigint().notNull().default(0n),
   lastTradeAt: t.bigint(),
+  // Progress in basis points (0-10000) for bonding curve completion
+  progress: t.integer().notNull().default(0),
 }));
 
 export const launchpadTrade = onchainTable("launchpadTrade", (t) => ({
@@ -238,11 +240,8 @@ export const graduatedV2Pool = onchainTable("graduatedV2Pool", (t) => ({
   token0: t.hex().notNull(),
   token1: t.hex().notNull(),
   launchpadTokenAddress: t.hex().notNull(), // link back to launchpad token
-  reserve0: t.bigint().notNull().default(0n),
-  reserve1: t.bigint().notNull().default(0n),
   createdAt: t.bigint().notNull(),
   createdAtBlock: t.bigint().notNull(),
   txHash: t.hex().notNull(),
   totalSwaps: t.integer().notNull().default(0),
-  lastSyncAt: t.bigint(),
 }));

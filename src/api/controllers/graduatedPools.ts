@@ -15,6 +15,7 @@ const graduatedPools = new Hono();
 /**
  * GET /graduated-pools - List all graduated V2 pools
  * Returns pools with token metadata for routing purposes
+ * Note: Reserves are returned as "0" - the API layer fetches fresh on-chain reserves
  */
 graduatedPools.get("/", async (c: Context) => {
   try {
@@ -23,8 +24,6 @@ graduatedPools.get("/", async (c: Context) => {
         pairAddress: graduatedV2Pool.pairAddress,
         token0: graduatedV2Pool.token0,
         token1: graduatedV2Pool.token1,
-        reserve0: graduatedV2Pool.reserve0,
-        reserve1: graduatedV2Pool.reserve1,
         launchpadTokenAddress: graduatedV2Pool.launchpadTokenAddress,
         createdAt: graduatedV2Pool.createdAt,
         totalSwaps: graduatedV2Pool.totalSwaps,
@@ -36,7 +35,14 @@ graduatedPools.get("/", async (c: Context) => {
       .leftJoin(launchpadToken, eq(graduatedV2Pool.launchpadTokenAddress, launchpadToken.address))
       .orderBy(desc(graduatedV2Pool.createdAt));
 
-    return c.json(replaceBigInts({ pools }, (v) => String(v)));
+    // Add zero reserves - API layer will fetch fresh on-chain data if needed
+    const poolsWithReserves = pools.map((pool: any) => ({
+      ...pool,
+      reserve0: "0",
+      reserve1: "0",
+    }));
+
+    return c.json(replaceBigInts({ pools: poolsWithReserves }, (v) => String(v)));
   } catch (error) {
     console.error("[GraduatedPools API] Error fetching pools:", error);
     return c.json({ error: "Failed to fetch graduated pools" }, 500);
@@ -65,7 +71,10 @@ graduatedPools.get("/:pairAddress", async (c: Context) => {
       return c.json({ error: "Pool not found" }, 404);
     }
 
-    return c.json(replaceBigInts({ pool: pools[0] }, (v) => String(v)));
+    // Add zero reserves - API layer will fetch fresh on-chain data if needed
+    const poolWithReserves = { ...pools[0], reserve0: "0", reserve1: "0" };
+
+    return c.json(replaceBigInts({ pool: poolWithReserves }, (v) => String(v)));
   } catch (error) {
     console.error("[GraduatedPools API] Error fetching pool:", error);
     return c.json({ error: "Failed to fetch pool" }, 500);
@@ -94,7 +103,10 @@ graduatedPools.get("/by-token/:tokenAddress", async (c: Context) => {
       return c.json({ error: "No V2 pool found for this token" }, 404);
     }
 
-    return c.json(replaceBigInts({ pool: pools[0] }, (v) => String(v)));
+    // Add zero reserves - API layer will fetch fresh on-chain data if needed
+    const poolWithReserves = { ...pools[0], reserve0: "0", reserve1: "0" };
+
+    return c.json(replaceBigInts({ pool: poolWithReserves }, (v) => String(v)));
   } catch (error) {
     console.error("[GraduatedPools API] Error fetching pool by token:", error);
     return c.json({ error: "Failed to fetch pool" }, 500);
