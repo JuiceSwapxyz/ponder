@@ -1,7 +1,7 @@
 /**
  * Launchpad API controller - endpoints for querying launchpad tokens and trades
  */
-import { eq, desc, and, sql, count, replaceBigInts } from "ponder";
+import { eq, desc, and, sql, count, replaceBigInts, or, gte, lt } from "ponder";
 import { Context, Hono } from "hono";
 import { getAddress } from "viem";
 // @ts-ignore
@@ -10,6 +10,10 @@ import { db } from "ponder:api";
 import { launchpadToken, launchpadTrade } from "ponder:schema";
 
 const launchpad = new Hono();
+
+// Progress threshold in basis points (0-10000) for "graduating" status
+// 80% = 8000 basis points
+const GRADUATING_THRESHOLD = 8000;
 
 /**
  * GET /launchpad/tokens - List all tokens with filtering
@@ -31,15 +35,20 @@ launchpad.get("/tokens", async (c: Context) => {
     let whereClause;
     switch (filter) {
       case "active":
+        // Active = not graduated AND progress < 80%
         whereClause = and(
           eq(launchpadToken.graduated, false),
-          eq(launchpadToken.canGraduate, false)
+          lt(launchpadToken.progress, GRADUATING_THRESHOLD)
         );
         break;
       case "graduating":
+        // Graduating = not graduated AND (progress >= 80% OR canGraduate is true)
         whereClause = and(
           eq(launchpadToken.graduated, false),
-          eq(launchpadToken.canGraduate, true)
+          or(
+            gte(launchpadToken.progress, GRADUATING_THRESHOLD),
+            eq(launchpadToken.canGraduate, true)
+          )
         );
         break;
       case "graduated":
@@ -186,20 +195,25 @@ launchpad.get("/stats", async (c: Context) => {
       .from(launchpadToken)
       .where(eq(launchpadToken.graduated, true));
 
+    // Active = not graduated AND progress < 80%
     const activeTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
       .where(and(
         eq(launchpadToken.graduated, false),
-        eq(launchpadToken.canGraduate, false)
+        lt(launchpadToken.progress, GRADUATING_THRESHOLD)
       ));
 
+    // Graduating = not graduated AND (progress >= 80% OR canGraduate is true)
     const graduatingTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
       .where(and(
         eq(launchpadToken.graduated, false),
-        eq(launchpadToken.canGraduate, true)
+        or(
+          gte(launchpadToken.progress, GRADUATING_THRESHOLD),
+          eq(launchpadToken.canGraduate, true)
+        )
       ));
 
     const totalTradesResult = await db
