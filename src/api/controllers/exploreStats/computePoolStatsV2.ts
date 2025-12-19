@@ -5,7 +5,6 @@ import { desc, inArray } from "ponder";
 import { db } from "ponder:api";
 import { computeTokenStatsByAddress } from "./computeTokenStats";
 import { getAddress } from "viem";
-import { getV2PairReservesMulticall } from "../../utils/citreaClient";
 
 export const computePoolStatsV2 = async () => {
   // Get graduated V2 pools ordered by total swaps
@@ -34,11 +33,8 @@ export const computePoolStatsV2 = async () => {
     tokens.map((t: any) => [t.address.toLowerCase(), t])
   );
 
-  // Fetch all reserves in a single multicall
-  const pairAddresses = v2Pools.map((p: any) => p.pairAddress);
-  const reservesMap = await getV2PairReservesMulticall(pairAddresses);
-
-  // Format pools with token data and on-chain reserves
+  // Format pools with token data
+  // Note: Reserves are returned as "0" - the API layer fetches fresh on-chain reserves if needed
   const formattedPools = await Promise.all(
     v2Pools.map(async (pool: any) => {
       const [token0DataWithMock, token1DataWithMock] = await Promise.all([
@@ -46,14 +42,12 @@ export const computePoolStatsV2 = async () => {
         computeTokenStatsByAddress(pool.token1, tokenMap),
       ]);
 
-      const reserves = reservesMap.get(pool.pairAddress.toLowerCase()) || { reserve0: 0n, reserve1: 0n };
-
       return {
         poolAddress: pool.pairAddress,
         timestamp: pool.createdAt.toString(),
         txCount: pool.totalSwaps.toString(),
-        reserve0: reserves.reserve0.toString(),
-        reserve1: reserves.reserve1.toString(),
+        reserve0: "0",
+        reserve1: "0",
         feeTier: "3000", // V2 pools have 0.3% fee (3000 basis points)
         token0: token0DataWithMock,
         token1: token1DataWithMock,

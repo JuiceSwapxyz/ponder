@@ -9,14 +9,13 @@ import { getAddress } from "viem";
 import { db } from "ponder:api";
 // @ts-ignore
 import { graduatedV2Pool, launchpadToken } from "ponder:schema";
-import { getV2PairReserves, getV2PairReservesMulticall } from "../utils/citreaClient";
 
 const graduatedPools = new Hono();
 
 /**
  * GET /graduated-pools - List all graduated V2 pools
  * Returns pools with token metadata for routing purposes
- * Fetches reserves on-chain for accurate liquidity data
+ * Note: Reserves are returned as "0" - the API layer fetches fresh on-chain reserves
  */
 graduatedPools.get("/", async (c: Context) => {
   try {
@@ -36,18 +35,12 @@ graduatedPools.get("/", async (c: Context) => {
       .leftJoin(launchpadToken, eq(graduatedV2Pool.launchpadTokenAddress, launchpadToken.address))
       .orderBy(desc(graduatedV2Pool.createdAt));
 
-    // Fetch on-chain reserves for all pools in a single multicall
-    const pairAddresses = pools.map((p: any) => p.pairAddress);
-    const reservesMap = await getV2PairReservesMulticall(pairAddresses);
-
-    const poolsWithReserves = pools.map((pool: any) => {
-      const reserves = reservesMap.get(pool.pairAddress.toLowerCase()) || { reserve0: 0n, reserve1: 0n };
-      return {
-        ...pool,
-        reserve0: reserves.reserve0,
-        reserve1: reserves.reserve1,
-      };
-    });
+    // Add zero reserves - API layer will fetch fresh on-chain data if needed
+    const poolsWithReserves = pools.map((pool: any) => ({
+      ...pool,
+      reserve0: "0",
+      reserve1: "0",
+    }));
 
     return c.json(replaceBigInts({ pools: poolsWithReserves }, (v) => String(v)));
   } catch (error) {
@@ -78,9 +71,8 @@ graduatedPools.get("/:pairAddress", async (c: Context) => {
       return c.json({ error: "Pool not found" }, 404);
     }
 
-    // Fetch on-chain reserves
-    const { reserve0, reserve1 } = await getV2PairReserves(checksumAddress);
-    const poolWithReserves = { ...pools[0], reserve0, reserve1 };
+    // Add zero reserves - API layer will fetch fresh on-chain data if needed
+    const poolWithReserves = { ...pools[0], reserve0: "0", reserve1: "0" };
 
     return c.json(replaceBigInts({ pool: poolWithReserves }, (v) => String(v)));
   } catch (error) {
@@ -111,9 +103,8 @@ graduatedPools.get("/by-token/:tokenAddress", async (c: Context) => {
       return c.json({ error: "No V2 pool found for this token" }, 404);
     }
 
-    // Fetch on-chain reserves
-    const { reserve0, reserve1 } = await getV2PairReserves(pools[0].pairAddress);
-    const poolWithReserves = { ...pools[0], reserve0, reserve1 };
+    // Add zero reserves - API layer will fetch fresh on-chain data if needed
+    const poolWithReserves = { ...pools[0], reserve0: "0", reserve1: "0" };
 
     return c.json(replaceBigInts({ pool: poolWithReserves }, (v) => String(v)));
   } catch (error) {
