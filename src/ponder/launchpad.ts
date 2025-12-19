@@ -8,6 +8,23 @@ import { safeGetAddress, safeBigInt } from "../utils/helpers";
 
 const CITREA_TESTNET_CHAIN_ID = 5115;
 
+// Bonding curve constants (from contract)
+const INITIAL_VIRTUAL_TOKEN_RESERVES = 1073000000n * 10n**18n; // 1,073,000,000e18
+const INITIAL_REAL_TOKEN_RESERVES = 793100000n * 10n**18n; // 793,100,000e18
+
+/**
+ * Calculate bonding curve progress in basis points (0-10000)
+ * Progress = tokensSold / INITIAL_REAL * 10000
+ * tokensSold = INITIAL_VIRTUAL - currentVirtualReserves
+ */
+function calculateProgress(virtualTokenReserves: bigint): number {
+  const tokensSold = INITIAL_VIRTUAL_TOKEN_RESERVES - virtualTokenReserves;
+  // Ensure we don't go negative or exceed bounds
+  if (tokensSold <= 0n) return 0;
+  const progressBps = (tokensSold * 10000n) / INITIAL_REAL_TOKEN_RESERVES;
+  return Math.min(10000, Number(progressBps));
+}
+
 // Index new token creation from TokenFactory
 ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; context: any }) => {
   try {
@@ -36,6 +53,7 @@ ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; 
       totalBuys: 0,
       totalSells: 0,
       totalVolumeBase: 0n,
+      progress: 0,
     }).onConflictDoNothing();
 
     console.log(`[Launchpad] Indexed new token: ${event.args.symbol} (${tokenAddress})`);
@@ -70,6 +88,9 @@ ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; cont
       txHash: event.transaction.hash,
     }).onConflictDoNothing();
 
+    // Calculate progress from virtual token reserves emitted in event
+    const progress = calculateProgress(event.args.virtualTokenReserves);
+
     // Update token stats
     await context.db
       .update(launchpadToken, { id: tokenAddress })
@@ -77,6 +98,7 @@ ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; cont
         totalBuys: row.totalBuys + 1,
         totalVolumeBase: row.totalVolumeBase + event.args.baseIn,
         lastTradeAt: safeBigInt(event.block.timestamp),
+        progress,
       }));
   } catch (error) {
     console.error("[Launchpad] Error indexing Buy:", error);
@@ -109,6 +131,9 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
       txHash: event.transaction.hash,
     }).onConflictDoNothing();
 
+    // Calculate progress from virtual token reserves emitted in event
+    const progress = calculateProgress(event.args.virtualTokenReserves);
+
     // Update token stats
     await context.db
       .update(launchpadToken, { id: tokenAddress })
@@ -116,6 +141,7 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
         totalSells: row.totalSells + 1,
         totalVolumeBase: row.totalVolumeBase + event.args.baseOut,
         lastTradeAt: safeBigInt(event.block.timestamp),
+        progress,
       }));
   } catch (error) {
     console.error("[Launchpad] Error indexing Sell:", error);
@@ -163,8 +189,6 @@ ponder.on("BondingCurveToken:Graduated", async ({ event, context }: { event: any
         token0,
         token1,
         launchpadTokenAddress: tokenAddress,
-        reserve0: 0n, // Will be read on-chain by the API
-        reserve1: 0n,
         createdAt: safeBigInt(event.block.timestamp),
         createdAtBlock: safeBigInt(event.block.number),
         txHash: event.transaction.hash,
