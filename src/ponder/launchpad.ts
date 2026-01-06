@@ -45,6 +45,7 @@ ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; 
       symbol: event.args.symbol,
       creator: creatorAddress,
       baseAsset: baseAssetAddress,
+      metadataURI: event.args.metadataURI ?? null, // New in v2.1.0 - nullable for backwards compatibility
       createdAt: safeBigInt(event.block.timestamp),
       createdAtBlock: safeBigInt(event.block.number),
       txHash: event.transaction.hash,
@@ -56,7 +57,7 @@ ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; 
       progress: 0,
     }).onConflictDoNothing();
 
-    console.log(`[Launchpad] Indexed new token: ${event.args.symbol} (${tokenAddress})`);
+    console.log(`[Launchpad] Indexed new token: ${event.args.symbol} (${tokenAddress}) with metadata: ${event.args.metadataURI ?? 'none'}`);
   } catch (error) {
     console.error("[Launchpad] Error indexing TokenCreated:", error);
   }
