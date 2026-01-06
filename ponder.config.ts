@@ -10,7 +10,7 @@ import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
 import { parseAbiItem } from "viem";
 
 // Launchpad deployment block (Citrea Testnet)
-const LAUNCHPAD_START_BLOCK = 19372868;
+const LAUNCHPAD_START_BLOCK = 20411368;
 
 export default createConfig({
   chains: {
@@ -65,7 +65,7 @@ export default createConfig({
       startBlock: LAUNCHPAD_START_BLOCK,
       address: factory({
         address: LAUNCHPAD_ADDRESSES[5115].factory as `0x${string}`,
-        event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient)'),
+        event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient, string metadataURI)'),
         parameter: "token",
       })
     }
