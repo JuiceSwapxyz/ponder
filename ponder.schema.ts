@@ -200,6 +200,7 @@ export const launchpadToken = onchainTable("launchpadToken", (t) => ({
   symbol: t.text().notNull(),
   creator: t.hex().notNull(),
   baseAsset: t.hex().notNull(),
+  metadataURI: t.text(), // URI pointing to token metadata JSON (IPFS/Arweave/HTTPS) - nullable for pre-v2.1.0 tokens
   createdAt: t.bigint().notNull(),
   createdAtBlock: t.bigint().notNull(),
   txHash: t.hex().notNull(),
