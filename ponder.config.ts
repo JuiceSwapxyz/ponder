@@ -7,7 +7,12 @@ import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
 import { TokenFactoryAbi } from "./abis/TokenFactory";
 import { BondingCurveTokenAbi } from "./abis/BondingCurveToken";
 import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
+import { CHAIN_TO_ADDRESSES_MAP, ChainId } from "@juiceswapxyz/sdk-core";
 import { parseAbiItem } from "viem";
+
+// V3 addresses from sdk-core (single source of truth)
+const V3_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_TESTNET];
+const V3_START_BLOCK = 19975243; // Deployment block from deploy-v3/deployments/citreaTestnet/dex.json
 
 // Launchpad deployment block (Citrea Testnet)
 const LAUNCHPAD_START_BLOCK = 20411368;
@@ -32,22 +37,22 @@ export default createConfig({
     },
     NonfungiblePositionManager: {
       chain: "citreaTestnet",
-      address: "0xe46616BED47317653EE3B7794fC171F4444Ee1c5",
+      address: V3_ADDRESSES.nonfungiblePositionManagerAddress as `0x${string}`,
       abi: NonfungiblePositionManagerAbi as any,
-      startBlock: 15455019,
+      startBlock: V3_START_BLOCK,
     },
     UniswapV3Factory: {
       chain: "citreaTestnet",
-      address: "0x6832283eEA5a9A3C4384A5D9a06Db0ce6FE9C79E",
+      address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
       abi: UniswapV3FactoryAbi as any,
-      startBlock: 15455001,
+      startBlock: V3_START_BLOCK,
     },
     UniswapV3Pool: {
       chain: "citreaTestnet",
       abi: UniswapV3PoolAbi as any,
-      startBlock: 15455001,
+      startBlock: V3_START_BLOCK,
       address: factory({
-        address: "0x6832283eEA5a9A3C4384A5D9a06Db0ce6FE9C79E",
+        address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
         event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
         parameter: "pool",
       })
