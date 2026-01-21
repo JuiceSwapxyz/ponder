@@ -60,7 +60,7 @@ tokens.post("/byAddresses", async (c: Context) => {
     };
     }));
 
-    return c.json({ tokens: tokensResponse.filter((token) => token) });
+    return c.json({ tokens: tokensResponse });
   } catch (error) {
     console.error("Get tokens by address error:", error);
     return c.json({ error: "Internal server error" }, 500);
