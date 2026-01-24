@@ -78,29 +78,6 @@ export const swap = onchainTable("swap", (t) => ({
   isCampaignRelevant: t.boolean().notNull(),
   campaignTaskId: t.integer(),
 }));
-/*
-Example "Position", we will use it to build a new schema for positions
-{
-  "chainId": 11155111,
-  "protocolVersion": "PROTOCOL_VERSION_V3",
-  "v3Position": {
-      "tokenId": "210447",
-      "liquidity": "37945455597966861",
-      "feeTier": "3000",
-      "currentTick": "-115136",
-      "currentPrice": "250529060232794967902094762",
-      "tickSpacing": "60",
-      "token0UncollectedFees": "0",
-      "token1UncollectedFees": "0",
-      "amount0": "11999999999999921393",
-      "amount1": "119988133378106",
-      "totalLiquidityUsd": "5.265636176503667857671428106519472",
-      "currentLiquidity": "104350002894409105"
-  },
-  "status": "POSITION_STATUS_IN_RANGE",
-  "timestamp": 1758667656
-}
-*/
 
 export const pool = onchainTable("pool", (t) => ({
   id: t.text().primaryKey(),
@@ -115,6 +92,7 @@ export const pool = onchainTable("pool", (t) => ({
 
 export const position = onchainTable("position", (t) => ({
   id: t.text().primaryKey(),
+  chainId: t.integer().notNull(),
   tokenId: t.text(),
   owner: t.text(),
   poolAddress: t.text(),
@@ -126,6 +104,7 @@ export const position = onchainTable("position", (t) => ({
 
 export const token = onchainTable("token", (t) => ({
   id: t.text().primaryKey(),
+  chainId: t.integer().notNull(),
   address: t.text().notNull(),
   symbol: t.text().notNull(),
   decimals: t.integer().notNull(),
@@ -165,6 +144,7 @@ export const poolActivity = onchainTable("poolActivity", (t) => ({
 
 export const tokenStat = onchainTable("tokenStat", (t) => ({
   id: t.text().primaryKey(), // Token address + timestamp 1h or 24h rounded down
+  chainId: t.integer().notNull(),
   address: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   txCount: t.integer().notNull(),
@@ -174,6 +154,7 @@ export const tokenStat = onchainTable("tokenStat", (t) => ({
 
 export const poolStat = onchainTable("poolStat", (t) => ({
   id: t.text().primaryKey(), // Pool address + timestamp 1h or 24h rounded down
+  chainId: t.integer().notNull(),
   poolAddress: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   txCount: t.integer().notNull(),
