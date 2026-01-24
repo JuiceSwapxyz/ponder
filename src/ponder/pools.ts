@@ -12,7 +12,6 @@ import {
 // @ts-ignore
 import { ponder } from "ponder:registry";
 import { getAddress } from "viem";
-import { eq } from "ponder";
 import { CAMPAIGN_POOLS, processCampaignSwap } from "@/utils/campaign";
 
 const abs = (n: bigint) => n < 0n ? -n : n;
@@ -34,6 +33,7 @@ const updateTokenStat = async ({
         .insert(tokenStat)
         .values({
           id: getIdByTemporalFrame(tokenAddress, type, timestamp),
+          chainId: 5115,
           address: getAddress(tokenAddress),
           timestamp: timestamp,
           txCount: 1,
@@ -67,6 +67,7 @@ const updatePoolStat = async ({
         .insert(poolStat)
         .values({
           id: getIdByTemporalFrame(poolAddress, type, timestamp),
+          chainId: 5115,
           poolAddress: getAddress(poolAddress),
           timestamp: timestamp,
           txCount: 1,
@@ -93,70 +94,70 @@ ponder.on(
       }
 
       await context.db.insert(poolActivity).values({
-      id: event.id,
-      poolAddress: getAddress(event.log.address),
-      chainId: 5115,
-      blockNumber: event.log.blockNumber,
-      blockTimestamp: event.block.timestamp,
-      txHash: event.transaction.hash,
-      sender: getAddress(event.args.sender),
-      recipient: getAddress(event.args.recipient),
-      amount0: event.args.amount0,
-      amount1: event.args.amount1,
-      tick: event.args.tick,
-      liquidity: event.args.liquidity,
-      sqrtPriceX96: event.args.sqrtPriceX96,
-    }).onConflictDoNothing();
-
-    await updatePoolStat({
-      context,
-      timestamp: event.block.timestamp,
-      poolAddress: getAddress(event.log.address),
-      amount0: abs(event.args.amount0),
-      amount1: abs(event.args.amount1),
-    });
-
-    const poolInfo = await context.db.find(pool, { id: getAddress(event.log.address)})
-    if (poolInfo) {
-      const tokenIn =
-        event.args.amount0 > 0n ? poolInfo.token0 : poolInfo.token1;
-      const tokenOut =
-        event.args.amount0 > 0n ? poolInfo.token1 : poolInfo.token0;
-
-      const amountIn =
-        event.args.amount0 > 0n ? event.args.amount0 : event.args.amount1;
-      const amountOut =
-        event.args.amount1 > 0n ? event.args.amount1 : event.args.amount0;
-
-      await context.db.insert(transactionSwap).values({
         id: event.id,
-        txHash: event.transaction.hash,
+        poolAddress: getAddress(event.log.address),
         chainId: 5115,
-        blockNumber: event.block.number,
+        blockNumber: event.log.blockNumber,
         blockTimestamp: event.block.timestamp,
-        from: event.transaction.from,
-        to: event.transaction.to,
-        tokenIn: getAddress(tokenIn),
-        tokenOut: getAddress(tokenOut),
-        amountIn: amountIn,
-        amountOut: amountOut,
-        swapperAddress: getAddress(event.transaction.from),
+        txHash: event.transaction.hash,
+        sender: getAddress(event.args.sender),
+        recipient: getAddress(event.args.recipient),
+        amount0: event.args.amount0,
+        amount1: event.args.amount1,
+        tick: event.args.tick,
+        liquidity: event.args.liquidity,
+        sqrtPriceX96: event.args.sqrtPriceX96,
       }).onConflictDoNothing();
 
-      await updateTokenStat({
+      await updatePoolStat({
         context,
         timestamp: event.block.timestamp,
-        tokenAddress: getAddress(tokenIn),
-        amount: abs(amountIn),
+        poolAddress: getAddress(event.log.address),
+        amount0: abs(event.args.amount0),
+        amount1: abs(event.args.amount1),
       });
 
-      await updateTokenStat({
-        context,
-        timestamp: event.block.timestamp,
-        tokenAddress: getAddress(tokenOut),
-        amount: abs(amountOut),
-      });
-    }
+      const poolInfo = await context.db.find(pool, { id: getAddress(event.log.address) })
+      if (poolInfo) {
+        const tokenIn =
+          event.args.amount0 > 0n ? poolInfo.token0 : poolInfo.token1;
+        const tokenOut =
+          event.args.amount0 > 0n ? poolInfo.token1 : poolInfo.token0;
+
+        const amountIn =
+          event.args.amount0 > 0n ? event.args.amount0 : event.args.amount1;
+        const amountOut =
+          event.args.amount1 > 0n ? event.args.amount1 : event.args.amount0;
+
+        await context.db.insert(transactionSwap).values({
+          id: event.id,
+          txHash: event.transaction.hash,
+          chainId: 5115,
+          blockNumber: event.block.number,
+          blockTimestamp: event.block.timestamp,
+          from: event.transaction.from,
+          to: event.transaction.to,
+          tokenIn: getAddress(tokenIn),
+          tokenOut: getAddress(tokenOut),
+          amountIn: amountIn,
+          amountOut: amountOut,
+          swapperAddress: getAddress(event.transaction.from),
+        }).onConflictDoNothing();
+
+        await updateTokenStat({
+          context,
+          timestamp: event.block.timestamp,
+          tokenAddress: getAddress(tokenIn),
+          amount: abs(amountIn),
+        });
+
+        await updateTokenStat({
+          context,
+          timestamp: event.block.timestamp,
+          tokenAddress: getAddress(tokenOut),
+          amount: abs(amountOut),
+        });
+      }
 
       // Update block progress
       const lastUpdatedAt = BigInt(Math.floor(Date.now() / 1000));

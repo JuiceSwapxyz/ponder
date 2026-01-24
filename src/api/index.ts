@@ -12,7 +12,6 @@ import { graphql } from "ponder"; // @ts-ignore
 
 // Import controllers
 import positions from "./controllers/positions";
-import pools from "./controllers/pools";
 import tokens from "./controllers/tokens";
 import exploreStats from "./controllers/exploreStats";
 import launchpad from "./controllers/launchpad";
@@ -54,7 +53,6 @@ app.use("/playground", graphqlMiddleware); // Unconstrained by sync check
 
 // Mount API controllers
 app.route("/positions", positions);
-app.route("/pools", pools);
 app.route("/tokens", tokens);
 app.route("/exploreStats", exploreStats);
 app.route("/campaign", campaing);

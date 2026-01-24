@@ -61,6 +61,7 @@ ponder.on(
           .insert(token)
           .values({
             id: getAddress(event.args.token0).toLowerCase(),
+            chainId: 5115,
             address: getAddress(event.args.token0),
             symbol: token0DataOnchain.symbol,
             decimals: token0DataOnchain.decimals,
@@ -81,6 +82,7 @@ ponder.on(
           .insert(token)
           .values({
             id: getAddress(event.args.token1).toLowerCase(),
+            chainId: 5115,
             address: getAddress(event.args.token1),
             symbol: token1DataOnchain.symbol,
             decimals: token1DataOnchain.decimals,
@@ -159,6 +161,7 @@ ponder.on(
           .insert(position)
           .values({
             id: event.id,
+            chainId: 5115,
             owner: getAddress(event.args.to),
             poolAddress: getAddress(poolMintEvent.address),
             tokenId: event.args.tokenId.toString(),
@@ -171,6 +174,47 @@ ponder.on(
       }
     } catch (error) {
       console.error("Error processing Transfer event:", error);
+    }
+  }
+);
+
+ponder.on(
+  "NonfungiblePositionManager:IncreaseLiquidity",
+  async ({ event, context }: { event: any; context: any }) => {
+    try {
+      const tokenId = event.args.tokenId;
+      if (!tokenId) {
+        return;
+      }
+
+      await context.db
+        .update(position, {id: tokenId})
+        .set({
+          amount0: event.args.amount0,
+          amount1: event.args.amount1,
+        })
+    } catch (error) {
+      // Don't rethrow to prevent crashes
+    }
+  }
+);
+
+ponder.on(
+  "NonfungiblePositionManager:DecreaseLiquidity",
+  async ({ event, context }: { event: any; context: any }) => {
+    try {
+      const tokenId = event.args.tokenId;
+      if (!tokenId) {
+        return;
+      }
+      await context.db
+        .update(position)
+        .set({
+          amount0: event.args.amount0,
+          amount1: event.args.amount1,
+        })
+    } catch (error) {
+      // Don't rethrow to prevent crashes
     }
   }
 );

@@ -12,7 +12,6 @@ import { parseAbiItem } from "viem";
 
 // V3 addresses from sdk-core (single source of truth)
 const V3_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_TESTNET];
-const V3_START_BLOCK = 19975243; // Deployment block from deploy-v3/deployments/citreaTestnet/dex.json
 
 // Launchpad deployment block (Citrea Testnet)
 const LAUNCHPAD_START_BLOCK = 20411368;
@@ -39,18 +38,18 @@ export default createConfig({
       chain: "citreaTestnet",
       address: V3_ADDRESSES.nonfungiblePositionManagerAddress as `0x${string}`,
       abi: NonfungiblePositionManagerAbi as any,
-      startBlock: V3_START_BLOCK,
+      startBlock: 19289932,
     },
     UniswapV3Factory: {
       chain: "citreaTestnet",
       address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
       abi: UniswapV3FactoryAbi as any,
-      startBlock: V3_START_BLOCK,
+      startBlock: 19289882,
     },
     UniswapV3Pool: {
       chain: "citreaTestnet",
       abi: UniswapV3PoolAbi as any,
-      startBlock: V3_START_BLOCK,
+      startBlock: 19289882,
       address: factory({
         address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
         event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
@@ -78,7 +77,7 @@ export default createConfig({
   blocks: {
     blockProgress: {
       chain: "citreaTestnet",
-      startBlock: 16900000,
+      startBlock: 19289882,
       interval: 100,
     }
   }
