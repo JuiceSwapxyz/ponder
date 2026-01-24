@@ -160,7 +160,7 @@ ponder.on(
         await context.db
           .insert(position)
           .values({
-            id: event.id,
+            id: `${5115}-${event.args.tokenId}`,
             chainId: 5115,
             owner: getAddress(event.args.to),
             poolAddress: getAddress(poolMintEvent.address),
@@ -188,7 +188,7 @@ ponder.on(
       }
 
       await context.db
-        .update(position, {id: tokenId})
+        .update(position, { id: `${5115}-${tokenId}` })
         .set({
           amount0: event.args.amount0,
           amount1: event.args.amount1,
@@ -208,7 +208,7 @@ ponder.on(
         return;
       }
       await context.db
-        .update(position)
+        .update(position, { id: `${5115}-${tokenId}` })
         .set({
           amount0: event.args.amount0,
           amount1: event.args.amount1,
