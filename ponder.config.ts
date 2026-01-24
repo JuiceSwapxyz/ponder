@@ -77,7 +77,7 @@ export default createConfig({
   blocks: {
     blockProgress: {
       chain: "citreaTestnet",
-      startBlock: 19289882,
+      startBlock: "latest",
       interval: 100,
     }
   }
