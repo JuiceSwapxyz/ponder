@@ -20,7 +20,7 @@ export default createConfig({
     // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "https://rpc.testnet.juiceswap.com/"), {
+      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "https://dev.rpc.testnet.juiceswap.com/"), {
         requestsPerSecond: 40
       }),
     },
@@ -76,7 +76,7 @@ export default createConfig({
   blocks: {
     blockProgress: {
       chain: "citreaTestnet",
-      startBlock: "latest",
+      startBlock: 21281808,
       interval: 100,
     }
   }
