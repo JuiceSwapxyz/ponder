@@ -5,6 +5,8 @@ import {
   pool,
   poolActivity,
   poolStat,
+  swap,
+  taskCompletion,
   tokenStat,
   transactionSwap,
 } from "ponder.schema";
@@ -12,7 +14,8 @@ import {
 // @ts-ignore
 import { ponder } from "ponder:registry";
 import { getAddress } from "viem";
-import { CAMPAIGN_POOLS, processCampaignSwap } from "@/utils/campaign";
+import { CAMPAIGN_POOLS, safeBigInt } from "@/utils/campaign";
+import { safeGetAddress } from "@/utils/helpers";
 
 const abs = (n: bigint) => n < 0n ? -n : n;
 
@@ -175,16 +178,71 @@ ponder.on(
           blockTimestamp: event.block.timestamp,
           lastUpdatedAt,
         }));
+
+
+      const txHash = event?.transaction?.hash;
+      const recipient = event?.args?.recipient;
+      const blockNumber = event?.block?.number;
+      const blockTimestamp = event?.block?.timestamp;
+
+      if (!txHash || !recipient || !event?.id) {
+        return;
+      }
+
+      const uniqueId = event.id;
+      const walletAddress = safeGetAddress(recipient);
+      const chainId = 5115;
+
+      // Determine token flow and amounts safely
+      const amount0 = safeBigInt(event?.args?.amount0);
+      const amount1 = safeBigInt(event?.args?.amount1);
+
+      // UniswapV3 logic: negative amount = token going out, positive = token coming in
+      const amountIn = amount0 < BigInt(0) ? -amount0 : amount0;
+      const amountOut = amount1 > BigInt(0) ? amount1 : -amount1;
+
+      const campaignPoolInfo = CAMPAIGN_POOLS[getAddress(event.log.address).toLowerCase()];
+      // Store swap record with defensive values
+      await context.db.insert(swap).values({
+        id: uniqueId,
+        txHash: txHash,
+        chainId: chainId,
+        blockNumber: safeBigInt(blockNumber),
+        blockTimestamp: safeBigInt(blockTimestamp),
+        from: safeGetAddress(event?.args?.sender),
+        to: walletAddress,
+        tokenIn: safeGetAddress(event?.log?.address),
+        tokenOut: safeGetAddress(event?.log?.address),
+        amountIn: amountIn,
+        amountOut: amountOut,
+        router: safeGetAddress(event?.transaction?.to),
+        methodSignature: String(event?.transaction?.input || "0x").slice(0, 10),
+        isCampaignRelevant: Boolean(campaignPoolInfo),
+        campaignTaskId: campaignPoolInfo?.taskId,
+      }).onConflictDoNothing();
+
+      // Record task completion (prevent duplicates)
+      if (campaignPoolInfo) {
+        const completionId = `${chainId}:${walletAddress.toLowerCase()}:${campaignPoolInfo?.taskId}`;
+        await context.db.insert(taskCompletion).values({
+          id: completionId,
+          walletAddress: walletAddress,
+          chainId: chainId,
+          taskId: campaignPoolInfo?.taskId,
+          txHash: txHash,
+          completedAt: safeBigInt(blockTimestamp),
+          swapAmount: amountOut,
+          inputToken: safeGetAddress(event?.log?.address),
+          outputToken: safeGetAddress(event?.log?.address),
+          blockNumber: safeBigInt(blockNumber),
+        }).onConflictDoNothing();
+      }
+
+
+
     } catch (error) {
       console.error("Error processing Swap event:", error);
       // Don't rethrow to prevent Ponder's error formatter from accessing null transaction
-    }
-
-    // Campaign processing
-    const poolInfo = CAMPAIGN_POOLS[getAddress(event.log.address).toLowerCase()];
-
-    if (poolInfo) {
-      await processCampaignSwap(event, context, getAddress(event.log.address).toLowerCase(), poolInfo.taskId, poolInfo.symbol);
     }
   }
 );
