@@ -13,8 +13,7 @@ import { parseAbiItem } from "viem";
 // V3 addresses from sdk-core (single source of truth)
 const V3_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_TESTNET];
 
-// Launchpad deployment block (Citrea Testnet)
-const LAUNCHPAD_START_BLOCK = 20411368;
+const START_BLOCK = 21252514;
 
 export default createConfig({
   chains: {
@@ -38,18 +37,18 @@ export default createConfig({
       chain: "citreaTestnet",
       address: V3_ADDRESSES.nonfungiblePositionManagerAddress as `0x${string}`,
       abi: NonfungiblePositionManagerAbi as any,
-      startBlock: 19289932,
+      startBlock: START_BLOCK,
     },
     UniswapV3Factory: {
       chain: "citreaTestnet",
       address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
       abi: UniswapV3FactoryAbi as any,
-      startBlock: 19289882,
+      startBlock: START_BLOCK,
     },
     UniswapV3Pool: {
       chain: "citreaTestnet",
       abi: UniswapV3PoolAbi as any,
-      startBlock: 19289882,
+      startBlock: START_BLOCK,
       address: factory({
         address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
         event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
@@ -61,12 +60,12 @@ export default createConfig({
       chain: "citreaTestnet",
       address: LAUNCHPAD_ADDRESSES[5115].factory as `0x${string}`,
       abi: TokenFactoryAbi as any,
-      startBlock: LAUNCHPAD_START_BLOCK,
+      startBlock: START_BLOCK,
     },
     BondingCurveToken: {
       chain: "citreaTestnet",
       abi: BondingCurveTokenAbi as any,
-      startBlock: LAUNCHPAD_START_BLOCK,
+      startBlock: START_BLOCK,
       address: factory({
         address: LAUNCHPAD_ADDRESSES[5115].factory as `0x${string}`,
         event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient, string metadataURI)'),
