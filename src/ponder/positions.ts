@@ -34,12 +34,13 @@ ponder.on(
   "UniswapV3Factory:PoolCreated",
   async ({ event, context }: { event: any; context: any }) => {
     try {
+      const chainId = context.chain.id;
       // UniswapV3Factory:PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)
       await context.db
         .insert(pool)
         .values({
           id: getAddress(event.args.pool),
-          chainId: 5115,
+          chainId,
           address: getAddress(event.args.pool),
           token0: getAddress(event.args.token0),
           token1: getAddress(event.args.token1),
@@ -61,7 +62,7 @@ ponder.on(
           .insert(token)
           .values({
             id: getAddress(event.args.token0).toLowerCase(),
-            chainId: 5115,
+            chainId,
             address: getAddress(event.args.token0),
             symbol: token0DataOnchain.symbol,
             decimals: token0DataOnchain.decimals,
@@ -82,7 +83,7 @@ ponder.on(
           .insert(token)
           .values({
             id: getAddress(event.args.token1).toLowerCase(),
-            chainId: 5115,
+            chainId,
             address: getAddress(event.args.token1),
             symbol: token1DataOnchain.symbol,
             decimals: token1DataOnchain.decimals,
@@ -100,9 +101,10 @@ ponder.on(
 ponder.on(
   "NonfungiblePositionManager:Transfer", // Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
   async ({ event, context }: { event: any; context: any }) => {
+    const chainId = context.chain.id;
+    
     // NFT ownership
     try {
-      const chainId = 5115;
       const tokenId = event?.args?.tokenId;
       const contractAddress = safeGetAddress(event?.log?.address);
 
@@ -160,8 +162,8 @@ ponder.on(
         await context.db
           .insert(position)
           .values({
-            id: `${5115}-${event.args.tokenId}`,
-            chainId: 5115,
+            id: `${chainId}-${event.args.tokenId}`,
+            chainId: chainId,
             owner: getAddress(event.args.to),
             poolAddress: getAddress(poolMintEvent.address),
             tokenId: event.args.tokenId.toString(),

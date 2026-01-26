@@ -8,6 +8,8 @@ import { safeGetAddress, safeBigInt } from "../utils/helpers";
 // NFT Claimed Event Handler
 ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any; context: any }) => {
   try {
+    const chainId = context.chain.id;
+    
     // Extract event data safely
     const txHash = event?.transaction?.hash;
     const claimer = event?.args?.claimer;
@@ -21,7 +23,6 @@ ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any
     }
 
     const walletAddress = safeGetAddress(claimer);
-    const chainId = 5115; // Citrea Testnet
 
     const claimId = `${chainId}:${walletAddress.toLowerCase()}`;
 
@@ -44,7 +45,7 @@ ponder.on("FirstSqueezerNFT:NFTClaimed", async ({ event, context }: { event: any
 
 ponder.on("FirstSqueezerNFT:Transfer", async ({ event, context }: { event: any; context: any }) => {
   try {
-    const chainId = 5115;
+    const chainId = context.chain.id;
     const tokenId = event?.args?.tokenId;
     const contractAddress = safeGetAddress(event?.log?.address);
     

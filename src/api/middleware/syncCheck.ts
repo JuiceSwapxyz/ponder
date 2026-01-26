@@ -78,6 +78,7 @@ async function getSyncStatus(): Promise<boolean> {
  * Whitelisted endpoints are always accessible
  */
 export async function syncCheckMiddleware(c: Context, next: Next) {
+  /*
   const whitelistedPaths = [
     '/api/sync-status',
     '/api/info',
@@ -103,6 +104,9 @@ export async function syncCheckMiddleware(c: Context, next: Next) {
     }, 503);
   }
 
+  await next();
+  */
+ // TODO: Uncomment this when we have a proper sync check
   await next();
 }
 

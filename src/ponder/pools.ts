@@ -24,11 +24,13 @@ const updateTokenStat = async ({
   timestamp,
   tokenAddress,
   amount,
+  chainId,
 }: {
   context: any;
   timestamp: bigint;
   tokenAddress: string;
   amount: bigint;
+  chainId: number;
 }) => {
   await Promise.all(
     TEMPORAL_FRAMES.map(async (type) => {
@@ -36,7 +38,7 @@ const updateTokenStat = async ({
         .insert(tokenStat)
         .values({
           id: getIdByTemporalFrame(tokenAddress, type, timestamp),
-          chainId: 5115,
+          chainId,
           address: getAddress(tokenAddress),
           timestamp: timestamp,
           txCount: 1,
@@ -57,12 +59,14 @@ const updatePoolStat = async ({
   poolAddress,
   amount0,
   amount1,
+  chainId,
 }: {
   context: any;
   timestamp: bigint;
   poolAddress: string;
   amount0: bigint;
   amount1: bigint;
+  chainId: number;
 }) => {
   await Promise.all(
     TEMPORAL_FRAMES.map(async (type) => {
@@ -70,7 +74,7 @@ const updatePoolStat = async ({
         .insert(poolStat)
         .values({
           id: getIdByTemporalFrame(poolAddress, type, timestamp),
-          chainId: 5115,
+          chainId,
           poolAddress: getAddress(poolAddress),
           timestamp: timestamp,
           txCount: 1,
@@ -91,6 +95,8 @@ ponder.on(
   "UniswapV3Pool:Swap",
   async ({ event, context }: { event: any; context: any }) => {
     try {
+      const chainId = context.chain.id;
+      
       if (!event.transaction) {
         console.warn("Missing transaction data for Swap event, skipping");
         return;
@@ -99,7 +105,7 @@ ponder.on(
       await context.db.insert(poolActivity).values({
         id: event.id,
         poolAddress: getAddress(event.log.address),
-        chainId: 5115,
+        chainId,
         blockNumber: event.log.blockNumber,
         blockTimestamp: event.block.timestamp,
         txHash: event.transaction.hash,
@@ -118,6 +124,7 @@ ponder.on(
         poolAddress: getAddress(event.log.address),
         amount0: abs(event.args.amount0),
         amount1: abs(event.args.amount1),
+        chainId,
       });
 
       const poolInfo = await context.db.find(pool, { id: getAddress(event.log.address) })
@@ -135,7 +142,7 @@ ponder.on(
         await context.db.insert(transactionSwap).values({
           id: event.id,
           txHash: event.transaction.hash,
-          chainId: 5115,
+          chainId,
           blockNumber: event.block.number,
           blockTimestamp: event.block.timestamp,
           from: event.transaction.from,
@@ -152,6 +159,7 @@ ponder.on(
           timestamp: event.block.timestamp,
           tokenAddress: getAddress(tokenIn),
           amount: abs(amountIn),
+          chainId,
         });
 
         await updateTokenStat({
@@ -159,6 +167,7 @@ ponder.on(
           timestamp: event.block.timestamp,
           tokenAddress: getAddress(tokenOut),
           amount: abs(amountOut),
+          chainId,
         });
       }
 
@@ -167,8 +176,8 @@ ponder.on(
       await context.db
         .insert(blockProgress)
         .values({
-          id: `blockProgress`,
-          chainId: 5115,
+          id: `blockProgress-${chainId}`,
+          chainId,
           blockNumber: event.block.number,
           blockTimestamp: event.block.timestamp,
           lastUpdatedAt,
@@ -191,7 +200,6 @@ ponder.on(
 
       const uniqueId = event.id;
       const walletAddress = safeGetAddress(recipient);
-      const chainId = 5115;
 
       // Determine token flow and amounts safely
       const amount0 = safeBigInt(event?.args?.amount0);
