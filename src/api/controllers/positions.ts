@@ -36,7 +36,7 @@ const aggregatePosition = async (pos: any) => {
   const token1Info = token1Data[0];
 
   return {
-    chainId: 5115,
+    chainId: pos.chainId,
     protocolVersion: "PROTOCOL_VERSION_V3",
     case: 'v3Position',
     v3Position: {
@@ -45,14 +45,14 @@ const aggregatePosition = async (pos: any) => {
       tickUpper: pos.tickUpper?.toString() || "887220",
       liquidity: "37945455597966861",
       token0: {
-        chainId: 5115,
+        chainId: token0Info?.chainId,
         address: token0Info?.address || "0x131a8656275bDd1130E0213414F3DA47C8C2a402",
         symbol: token0Info?.symbol || "DNN7",
         decimals: token0Info?.decimals || 18,
         name: token0Info?.name || "DnnToken6"
       },
       token1: {
-        chainId: 5115,
+        chainId: token1Info?.chainId,
         address: token1Info?.address || "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
         symbol: token1Info?.symbol || "WETH",
         decimals: token1Info?.decimals || 18,
