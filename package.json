@@ -26,6 +26,7 @@
   "homepage": "https://github.com/JuiceSwapxyz/ponder#readme",
   "dependencies": {
     "@hono/node-server": "^1.19.4",
+    "@juicedollar/jusd": "1.1.0",
     "@juiceswapxyz/launchpad": "2.1.0",
     "@juiceswapxyz/sdk-core": "^0.1.11-beta.0",
     "@types/cors": "^2.8.17",

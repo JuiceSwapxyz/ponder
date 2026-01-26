@@ -4,6 +4,7 @@
 import { eq, desc, and, sql, count, replaceBigInts, or, gte, lt } from "ponder";
 import { Context, Hono } from "hono";
 import { getAddress } from "viem";
+import { ADDRESS as JUSD_ADDRESSES } from "@juicedollar/jusd";
 // @ts-ignore
 import { db } from "ponder:api";
 // @ts-ignore
@@ -16,9 +17,10 @@ const launchpad = new Hono();
 const GRADUATING_THRESHOLD = 8000;
 
 /**
- * Valid JUSD address - only show tokens created with this baseAsset
+ * Valid JUSD address from @juicedollar/jusd SDK
+ * Tokens created with older factory versions using wrong JUSD address are filtered out
  */
-const VALID_JUSD_ADDRESS: `0x${string}` = "0x6a850a548fdd050e8961223ec8FfCDfacEa57E39";
+const VALID_JUSD_ADDRESS = getAddress(JUSD_ADDRESSES[5115].juiceDollar);
 
 /**
  * GET /launchpad/tokens - List all tokens with filtering
