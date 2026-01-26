@@ -1,6 +1,6 @@
 {
   "name": "juiceswap-ponder",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "description": "JuiceSwap Campaign API - Ponder indexer for Citrea Testnet",
   "main": "index.js",
   "type": "module",
@@ -27,7 +27,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.4",
     "@juiceswapxyz/launchpad": "^3.0.0",
-    "@juiceswapxyz/sdk-core": "^3.0.0",
+    "@juiceswapxyz/sdk-core": "^3.0.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "axios": "^1.12.2",

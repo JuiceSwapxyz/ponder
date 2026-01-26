@@ -1,54 +1,6 @@
 import { http } from "viem";
 
 /**
- * Sanitizes an object to prevent Reflect.get errors by ensuring all properties are proper objects.
- * Converts problematic values to safe defaults.
- */
-function sanitizeObject(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return {};
-  }
-
-  if (typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item));
-  }
-
-  const sanitized: any = {};
-  for (const [key, value] of Object.entries(obj)) {
-    try {
-      // Ensure the key exists and the value is accessible
-      if (value !== null && value !== undefined) {
-        if (typeof value === 'object') {
-          sanitized[key] = sanitizeObject(value);
-        } else {
-          sanitized[key] = value;
-        }
-      } else {
-        // Replace null/undefined with safe defaults based on common RPC fields
-        if (key === 'input' || key === 'data') {
-          sanitized[key] = '0x';
-        } else if (key.includes('Index') || key.includes('Number')) {
-          sanitized[key] = '0x0';
-        } else if (key.includes('Hash')) {
-          sanitized[key] = '0x0000000000000000000000000000000000000000000000000000000000000000';
-        } else {
-          sanitized[key] = value; // Keep original null/undefined for non-critical fields
-        }
-      }
-    } catch (error) {
-      console.warn(`Error sanitizing property ${key}:`, error);
-      sanitized[key] = null; // Safe fallback
-    }
-  }
-
-  return sanitized;
-}
-
-/**
  * Comprehensive fix for Citrea RPC incompatibilities.
  * Wraps HTTP transport to correct transactionIndex and sanitize problematic data.
  *
