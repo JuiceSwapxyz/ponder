@@ -6,8 +6,6 @@ import { launchpadToken, launchpadTrade, graduatedV2Pool } from "ponder.schema";
 import { ponder } from "ponder:registry";
 import { safeGetAddress, safeBigInt } from "../utils/helpers";
 
-const CITREA_TESTNET_CHAIN_ID = 5115;
-
 // Bonding curve constants (from contract)
 const INITIAL_VIRTUAL_TOKEN_RESERVES = 1073000000n * 10n**18n; // 1,073,000,000e18
 const INITIAL_REAL_TOKEN_RESERVES = 793100000n * 10n**18n; // 793,100,000e18
@@ -28,6 +26,8 @@ function calculateProgress(virtualTokenReserves: bigint): number {
 // Index new token creation from TokenFactory
 ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; context: any }) => {
   try {
+    const chainId = context.chain.id;
+    
     if (!event.transaction) {
       console.warn("[Launchpad] Missing transaction data for TokenCreated event, skipping");
       return;
@@ -40,7 +40,7 @@ ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; 
     await context.db.insert(launchpadToken).values({
       id: tokenAddress,
       address: tokenAddress,
-      chainId: CITREA_TESTNET_CHAIN_ID,
+      chainId,
       name: event.args.name,
       symbol: event.args.symbol,
       creator: creatorAddress,
@@ -66,6 +66,8 @@ ponder.on("TokenFactory:TokenCreated", async ({ event, context }: { event: any; 
 // Index buy trades from BondingCurveToken
 ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; context: any }) => {
   try {
+    const chainId = context.chain.id;
+    
     if (!event.transaction) {
       console.warn("[Launchpad] Missing transaction data for Buy event, skipping");
       return;
@@ -79,7 +81,7 @@ ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; cont
     await context.db.insert(launchpadTrade).values({
       id: tradeId,
       tokenAddress,
-      chainId: CITREA_TESTNET_CHAIN_ID,
+      chainId,
       trader: traderAddress,
       isBuy: true,
       baseAmount: event.args.baseIn,
@@ -109,6 +111,8 @@ ponder.on("BondingCurveToken:Buy", async ({ event, context }: { event: any; cont
 // Index sell trades from BondingCurveToken
 ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; context: any }) => {
   try {
+    const chainId = context.chain.id;
+    
     if (!event.transaction) {
       console.warn("[Launchpad] Missing transaction data for Sell event, skipping");
       return;
@@ -122,7 +126,7 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
     await context.db.insert(launchpadTrade).values({
       id: tradeId,
       tokenAddress,
-      chainId: CITREA_TESTNET_CHAIN_ID,
+      chainId,
       trader: traderAddress,
       isBuy: false,
       baseAmount: event.args.baseOut,
@@ -152,6 +156,8 @@ ponder.on("BondingCurveToken:Sell", async ({ event, context }: { event: any; con
 // Index graduation event
 ponder.on("BondingCurveToken:Graduated", async ({ event, context }: { event: any; context: any }) => {
   try {
+    const chainId = context.chain.id;
+    
     if (!event.transaction) {
       console.warn("[Launchpad] Missing transaction data for Graduated event, skipping");
       return;
@@ -186,7 +192,7 @@ ponder.on("BondingCurveToken:Graduated", async ({ event, context }: { event: any
       await context.db.insert(graduatedV2Pool).values({
         id: pairAddress,
         pairAddress,
-        chainId: CITREA_TESTNET_CHAIN_ID,
+        chainId,
         token0,
         token1,
         launchpadTokenAddress: tokenAddress,

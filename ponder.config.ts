@@ -10,74 +10,131 @@ import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
 import { CHAIN_TO_ADDRESSES_MAP, ChainId } from "@juiceswapxyz/sdk-core";
 import { parseAbiItem } from "viem";
 
-// V3 addresses from sdk-core (single source of truth)
-const V3_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_TESTNET];
+const LAUNCHPAD_TESTNET_ADDRESSES = LAUNCHPAD_ADDRESSES[5115];
+const LAUNCHPAD_MAINNET_ADDRESSES = LAUNCHPAD_ADDRESSES[4114];
+const START_BLOCK_LAUNCHPAD_TESTNET = 21252514;
+const START_BLOCK_LAUNCHPAD_MAINNET = 2652915;
 
-const START_BLOCK = 21252514;
+const V3_TESTNET_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_TESTNET];
+const V3_MAINNET_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_MAINNET];
+const START_BLOCK_TESTNET = 21252514;
+const START_BLOCK_MAINNET = 2651625;
 
 export default createConfig({
   chains: {
-    // Citrea Testnet
     citreaTestnet: {
       id: 5115,
-      rpc: rateLimit(citreaTransport(process.env.CITREA_RPC_URL ?? "https://dev.rpc.testnet.juiceswap.com/"), {
+      rpc: rateLimit(citreaTransport(process.env.CITREA_5115_RPC_URL ?? "https://dev.rpc.testnet.juiceswap.com/"), {
         requestsPerSecond: 40
       }),
     },
+    citrea: {
+      id: 4114,
+      rpc: rateLimit(citreaTransport(process.env.CITREA_4114_RPC_URL ?? "https://rpc.citreascan.com/"), {
+        requestsPerSecond: 40
+      }),
+    }
   },
   contracts: {
-    // CITREA TESTNET - First Squeezer NFT Campaign
     FirstSqueezerNFT: {
+      abi: FirstSqueezerNFTAbi as any,
       chain: "citreaTestnet",
       address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
-      abi: FirstSqueezerNFTAbi as any,
       startBlock: "latest",
     },
     NonfungiblePositionManager: {
-      chain: "citreaTestnet",
-      address: V3_ADDRESSES.nonfungiblePositionManagerAddress as `0x${string}`,
       abi: NonfungiblePositionManagerAbi as any,
-      startBlock: START_BLOCK,
+      chain: {
+        citreaTestnet: {
+          address: V3_TESTNET_ADDRESSES.nonfungiblePositionManagerAddress as `0x${string}`,
+          startBlock: START_BLOCK_TESTNET,
+        },
+        citrea: {
+          address: V3_MAINNET_ADDRESSES.nonfungiblePositionManagerAddress as `0x${string}`,
+          startBlock: START_BLOCK_MAINNET,
+        }
+      }
     },
     UniswapV3Factory: {
-      chain: "citreaTestnet",
-      address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
       abi: UniswapV3FactoryAbi as any,
-      startBlock: START_BLOCK,
+      chain: {
+        citreaTestnet: {
+          address: V3_TESTNET_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
+          startBlock: START_BLOCK_TESTNET,
+        },
+        citrea: {
+          address: V3_MAINNET_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
+          startBlock: START_BLOCK_MAINNET,
+        }
+      },
     },
     UniswapV3Pool: {
-      chain: "citreaTestnet",
       abi: UniswapV3PoolAbi as any,
-      startBlock: START_BLOCK,
-      address: factory({
-        address: V3_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
-        event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
-        parameter: "pool",
-      })
+      chain: {
+        citreaTestnet: {
+          startBlock: START_BLOCK_TESTNET,
+          address: factory({
+            address: V3_TESTNET_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
+            event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
+            parameter: "pool",
+          })
+        },
+        citrea: {
+          startBlock: START_BLOCK_MAINNET,
+          address: factory({
+            address: V3_MAINNET_ADDRESSES.v3CoreFactoryAddress as `0x${string}`,
+            event: parseAbiItem('event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)'),
+            parameter: "pool",
+          })
+        }
+      },
     },
-    // CITREA TESTNET - Launchpad (Bonding Curve Token Factory)
     TokenFactory: {
-      chain: "citreaTestnet",
-      address: LAUNCHPAD_ADDRESSES[5115].factory as `0x${string}`,
       abi: TokenFactoryAbi as any,
-      startBlock: START_BLOCK,
+      chain: {
+        citreaTestnet: {
+          address: LAUNCHPAD_TESTNET_ADDRESSES.factory as `0x${string}`,
+          startBlock: START_BLOCK_LAUNCHPAD_TESTNET,
+        },
+        citrea: {
+          address: LAUNCHPAD_MAINNET_ADDRESSES.factory as `0x${string}`,
+          startBlock: START_BLOCK_LAUNCHPAD_MAINNET,
+        },
+      },
     },
     BondingCurveToken: {
-      chain: "citreaTestnet",
       abi: BondingCurveTokenAbi as any,
-      startBlock: START_BLOCK,
-      address: factory({
-        address: LAUNCHPAD_ADDRESSES[5115].factory as `0x${string}`,
-        event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient, string metadataURI)'),
-        parameter: "token",
-      })
+      chain: {
+        citreaTestnet: {
+          startBlock: START_BLOCK_LAUNCHPAD_TESTNET,
+          address: factory({
+            address: LAUNCHPAD_TESTNET_ADDRESSES.factory as `0x${string}`,
+            event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient, string metadataURI)'),
+            parameter: "token",
+          })
+        },
+        citrea: {
+          startBlock: START_BLOCK_LAUNCHPAD_MAINNET,
+          address: factory({
+            address: LAUNCHPAD_MAINNET_ADDRESSES.factory as `0x${string}`,
+            event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient, string metadataURI)'),
+            parameter: "token",
+          })
+        },
+      },
     }
   },
   blocks: {
     blockProgress: {
-      chain: "citreaTestnet",
-      startBlock: 21281808,
+      chain: {
+        citreaTestnet: {
+          startBlock: "latest",
+        },
+        citrea: {
+          startBlock: START_BLOCK_MAINNET,
+        }
+      },
       interval: 100,
     }
-  }
+  },
 });
