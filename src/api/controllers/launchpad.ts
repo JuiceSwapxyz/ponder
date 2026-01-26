@@ -16,6 +16,11 @@ const launchpad = new Hono();
 const GRADUATING_THRESHOLD = 8000;
 
 /**
+ * Valid JUSD address - only show tokens created with this baseAsset
+ */
+const VALID_JUSD_ADDRESS: `0x${string}` = "0x6a850a548fdd050e8961223ec8FfCDfacEa57E39";
+
+/**
  * GET /launchpad/tokens - List all tokens with filtering
  * Query params:
  *   - filter: "all" | "active" | "graduating" | "graduated" (default: "all")
@@ -31,12 +36,16 @@ launchpad.get("/tokens", async (c: Context) => {
     const sort = c.req.query("sort") || "newest";
     const offset = page * limit;
 
+    // Base condition: only show tokens with valid JUSD baseAsset
+    const validBaseAsset = eq(launchpadToken.baseAsset, VALID_JUSD_ADDRESS);
+
     // Build where clause based on filter
     let whereClause;
     switch (filter) {
       case "active":
         // Active = not graduated AND progress < 80%
         whereClause = and(
+          validBaseAsset,
           eq(launchpadToken.graduated, false),
           lt(launchpadToken.progress, GRADUATING_THRESHOLD)
         );
@@ -44,6 +53,7 @@ launchpad.get("/tokens", async (c: Context) => {
       case "graduating":
         // Graduating = not graduated AND (progress >= 80% OR canGraduate is true)
         whereClause = and(
+          validBaseAsset,
           eq(launchpadToken.graduated, false),
           or(
             gte(launchpadToken.progress, GRADUATING_THRESHOLD),
@@ -52,10 +62,10 @@ launchpad.get("/tokens", async (c: Context) => {
         );
         break;
       case "graduated":
-        whereClause = eq(launchpadToken.graduated, true);
+        whereClause = and(validBaseAsset, eq(launchpadToken.graduated, true));
         break;
       default: // "all"
-        whereClause = undefined;
+        whereClause = validBaseAsset;
     }
 
     // Build order by based on sort
@@ -115,10 +125,14 @@ launchpad.get("/token/:address", async (c: Context) => {
     }
 
     const checksumAddress = getAddress(address);
+
     const tokens = await db
       .select()
       .from(launchpadToken)
-      .where(eq(launchpadToken.address, checksumAddress))
+      .where(and(
+        eq(launchpadToken.address, checksumAddress),
+        eq(launchpadToken.baseAsset, VALID_JUSD_ADDRESS)
+      ))
       .limit(1);
 
     if (tokens.length === 0) {
@@ -150,6 +164,21 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
     }
 
     const checksumAddress = getAddress(address);
+
+    // First check if the token exists and has valid baseAsset
+    const tokenCheck = await db
+      .select({ address: launchpadToken.address })
+      .from(launchpadToken)
+      .where(and(
+        eq(launchpadToken.address, checksumAddress),
+        eq(launchpadToken.baseAsset, VALID_JUSD_ADDRESS)
+      ))
+      .limit(1);
+
+    if (tokenCheck.length === 0) {
+      return c.json({ error: "Token not found" }, 404);
+    }
+
     const trades = await db
       .select()
       .from(launchpadTrade)
@@ -186,20 +215,25 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
  */
 launchpad.get("/stats", async (c: Context) => {
   try {
+    // Base condition: only count tokens with valid JUSD baseAsset
+    const validBaseAsset = eq(launchpadToken.baseAsset, VALID_JUSD_ADDRESS);
+
     const totalTokensResult = await db
       .select({ count: count() })
-      .from(launchpadToken);
+      .from(launchpadToken)
+      .where(validBaseAsset);
 
     const graduatedTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
-      .where(eq(launchpadToken.graduated, true));
+      .where(and(validBaseAsset, eq(launchpadToken.graduated, true)));
 
     // Active = not graduated AND progress < 80%
     const activeTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
       .where(and(
+        validBaseAsset,
         eq(launchpadToken.graduated, false),
         lt(launchpadToken.progress, GRADUATING_THRESHOLD)
       ));
@@ -209,6 +243,7 @@ launchpad.get("/stats", async (c: Context) => {
       .select({ count: count() })
       .from(launchpadToken)
       .where(and(
+        validBaseAsset,
         eq(launchpadToken.graduated, false),
         or(
           gte(launchpadToken.progress, GRADUATING_THRESHOLD),
@@ -216,13 +251,17 @@ launchpad.get("/stats", async (c: Context) => {
         )
       ));
 
+    // Count trades only for valid tokens (join with launchpadToken to filter)
     const totalTradesResult = await db
       .select({ count: count() })
-      .from(launchpadTrade);
+      .from(launchpadTrade)
+      .innerJoin(launchpadToken, eq(launchpadTrade.tokenAddress, launchpadToken.address))
+      .where(validBaseAsset);
 
     const totalVolumeResult = await db
       .select({ volume: sql<string>`COALESCE(SUM(${launchpadToken.totalVolumeBase}), 0)::text` })
-      .from(launchpadToken);
+      .from(launchpadToken)
+      .where(validBaseAsset);
 
     return c.json({
       totalTokens: totalTokensResult[0]?.count || 0,
@@ -247,6 +286,7 @@ launchpad.get("/recent-trades", async (c: Context) => {
   try {
     const limit = Math.min(50, Math.max(1, parseInt(c.req.query("limit") || "20")));
 
+    // Only show trades from tokens with valid JUSD baseAsset
     const trades = await db
       .select({
         id: launchpadTrade.id,
@@ -261,7 +301,8 @@ launchpad.get("/recent-trades", async (c: Context) => {
         tokenSymbol: launchpadToken.symbol,
       })
       .from(launchpadTrade)
-      .leftJoin(launchpadToken, eq(launchpadTrade.tokenAddress, launchpadToken.address))
+      .innerJoin(launchpadToken, eq(launchpadTrade.tokenAddress, launchpadToken.address))
+      .where(eq(launchpadToken.baseAsset, VALID_JUSD_ADDRESS))
       .orderBy(desc(launchpadTrade.timestamp))
       .limit(limit);
 
