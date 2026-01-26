@@ -3,7 +3,7 @@ import { Hono, Context } from "hono";
 import { db } from "ponder:api";
 // @ts-ignore
 import { position, pool, token, Position } from "ponder:schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getAddress } from "viem";
 
 const positions = new Hono();
@@ -80,6 +80,7 @@ const aggregatePosition = async (pos: any) => {
 positions.post("/owner", async (c: Context) => {
   try {
     const body = await c.req.json();
+    const chainIds: number[] | undefined = body.chainIds;
     const ownerAddress = body.address;
 
     if (!ownerAddress) {
@@ -88,10 +89,14 @@ positions.post("/owner", async (c: Context) => {
 
     const normalizedAddress = getAddress(ownerAddress);
 
+    const whereClause = chainIds 
+      ? and(eq(position.owner, normalizedAddress), inArray(position.chainId, chainIds)) 
+      : eq(position.owner, normalizedAddress);
+
     const userPositions = await db
       .select()
       .from(position)
-      .where(eq(position.owner, normalizedAddress));
+      .where(whereClause);
 
     // Aggregate positions with related data
     const aggregatedPositions = await Promise.all(
@@ -103,33 +108,6 @@ positions.post("/owner", async (c: Context) => {
     });
   } catch (error) {
     console.error("Get positions by owner error:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-});
-
-// Get specific position by token ID
-positions.post("/tokenId", async (c: Context) => {
-  try {
-    const body = await c.req.json();
-    const { tokenId } = body;
-
-    const positionData = await db
-      .select()
-      .from(position)
-      .where(eq(position.tokenId, tokenId))
-      .limit(1);
-
-    if (positionData.length === 0) {
-      return c.json({ error: "Position not found" }, 404);
-    }
-
-    const pos = positionData[0];
-    const aggregatedPosition = await aggregatePosition(pos);
-
-    return c.json({position: aggregatedPosition});
-
-  } catch (error) {
-    console.error("Get position by token ID error:", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 });

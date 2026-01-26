@@ -78,29 +78,6 @@ export const swap = onchainTable("swap", (t) => ({
   isCampaignRelevant: t.boolean().notNull(),
   campaignTaskId: t.integer(),
 }));
-/*
-Example "Position", we will use it to build a new schema for positions
-{
-  "chainId": 11155111,
-  "protocolVersion": "PROTOCOL_VERSION_V3",
-  "v3Position": {
-      "tokenId": "210447",
-      "liquidity": "37945455597966861",
-      "feeTier": "3000",
-      "currentTick": "-115136",
-      "currentPrice": "250529060232794967902094762",
-      "tickSpacing": "60",
-      "token0UncollectedFees": "0",
-      "token1UncollectedFees": "0",
-      "amount0": "11999999999999921393",
-      "amount1": "119988133378106",
-      "totalLiquidityUsd": "5.265636176503667857671428106519472",
-      "currentLiquidity": "104350002894409105"
-  },
-  "status": "POSITION_STATUS_IN_RANGE",
-  "timestamp": 1758667656
-}
-*/
 
 export const pool = onchainTable("pool", (t) => ({
   id: t.text().primaryKey(),
@@ -115,6 +92,7 @@ export const pool = onchainTable("pool", (t) => ({
 
 export const position = onchainTable("position", (t) => ({
   id: t.text().primaryKey(),
+  chainId: t.integer().notNull(),
   tokenId: t.text(),
   owner: t.text(),
   poolAddress: t.text(),
@@ -126,6 +104,7 @@ export const position = onchainTable("position", (t) => ({
 
 export const token = onchainTable("token", (t) => ({
   id: t.text().primaryKey(),
+  chainId: t.integer().notNull(),
   address: t.text().notNull(),
   symbol: t.text().notNull(),
   decimals: t.integer().notNull(),
@@ -165,6 +144,7 @@ export const poolActivity = onchainTable("poolActivity", (t) => ({
 
 export const tokenStat = onchainTable("tokenStat", (t) => ({
   id: t.text().primaryKey(), // Token address + timestamp 1h or 24h rounded down
+  chainId: t.integer().notNull(),
   address: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   txCount: t.integer().notNull(),
@@ -174,6 +154,7 @@ export const tokenStat = onchainTable("tokenStat", (t) => ({
 
 export const poolStat = onchainTable("poolStat", (t) => ({
   id: t.text().primaryKey(), // Pool address + timestamp 1h or 24h rounded down
+  chainId: t.integer().notNull(),
   poolAddress: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   txCount: t.integer().notNull(),
@@ -188,4 +169,61 @@ export const blockProgress = onchainTable("blockProgress", (t) => ({
   blockNumber: t.bigint().notNull(),
   blockTimestamp: t.bigint().notNull(),
   lastUpdatedAt: t.bigint().notNull(),
+}));
+
+// ============ LAUNCHPAD SCHEMA ============
+
+export const launchpadToken = onchainTable("launchpadToken", (t) => ({
+  id: t.text().primaryKey(), // token address
+  address: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  name: t.text().notNull(),
+  symbol: t.text().notNull(),
+  creator: t.hex().notNull(),
+  baseAsset: t.hex().notNull(),
+  metadataURI: t.text(), // URI pointing to token metadata JSON (IPFS/Arweave/HTTPS) - nullable for pre-v2.1.0 tokens
+  createdAt: t.bigint().notNull(),
+  createdAtBlock: t.bigint().notNull(),
+  txHash: t.hex().notNull(),
+
+  // State (updated on each trade/graduation)
+  graduated: t.boolean().notNull().default(false),
+  canGraduate: t.boolean().notNull().default(false),
+  v2Pair: t.hex(),
+  graduatedAt: t.bigint(),
+
+  // Stats (updated on trades)
+  totalBuys: t.integer().notNull().default(0),
+  totalSells: t.integer().notNull().default(0),
+  totalVolumeBase: t.bigint().notNull().default(0n),
+  lastTradeAt: t.bigint(),
+  // Progress in basis points (0-10000) for bonding curve completion
+  progress: t.integer().notNull().default(0),
+}));
+
+export const launchpadTrade = onchainTable("launchpadTrade", (t) => ({
+  id: t.text().primaryKey(), // txHash-logIndex
+  tokenAddress: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  trader: t.hex().notNull(),
+  isBuy: t.boolean().notNull(),
+  baseAmount: t.bigint().notNull(),
+  tokenAmount: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  txHash: t.hex().notNull(),
+}));
+
+// V2 pools created when launchpad tokens graduate
+export const graduatedV2Pool = onchainTable("graduatedV2Pool", (t) => ({
+  id: t.text().primaryKey(), // pair address
+  pairAddress: t.hex().notNull(),
+  chainId: t.integer().notNull(),
+  token0: t.hex().notNull(),
+  token1: t.hex().notNull(),
+  launchpadTokenAddress: t.hex().notNull(), // link back to launchpad token
+  createdAt: t.bigint().notNull(),
+  createdAtBlock: t.bigint().notNull(),
+  txHash: t.hex().notNull(),
+  totalSwaps: t.integer().notNull().default(0),
 }));
