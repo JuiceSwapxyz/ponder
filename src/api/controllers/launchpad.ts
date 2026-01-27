@@ -22,6 +22,7 @@ const GRADUATING_THRESHOLD = 8000;
  *   - page: number (default: 0)
  *   - limit: number (default: 20, max: 100)
  *   - sort: "newest" | "volume" | "trades" (default: "newest")
+ *   - chainId: number (optional - filter by chain)
  */
 launchpad.get("/tokens", async (c: Context) => {
   try {
@@ -29,22 +30,29 @@ launchpad.get("/tokens", async (c: Context) => {
     const page = Math.max(0, parseInt(c.req.query("page") || "0"));
     const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") || "20")));
     const sort = c.req.query("sort") || "newest";
+    const chainIdParam = c.req.query("chainId");
+    const chainId = chainIdParam ? parseInt(chainIdParam) : undefined;
     const offset = page * limit;
 
-    // Build where clause based on filter
-    let whereClause;
+    // Build where conditions array
+    const conditions = [];
+
+    // Add chainId filter if provided
+    if (chainId !== undefined && !isNaN(chainId)) {
+      conditions.push(eq(launchpadToken.chainId, chainId));
+    }
+
+    // Add status filter
     switch (filter) {
       case "active":
         // Active = not graduated AND progress < 80%
-        whereClause = and(
-          eq(launchpadToken.graduated, false),
-          lt(launchpadToken.progress, GRADUATING_THRESHOLD)
-        );
+        conditions.push(eq(launchpadToken.graduated, false));
+        conditions.push(lt(launchpadToken.progress, GRADUATING_THRESHOLD));
         break;
       case "graduating":
         // Graduating = not graduated AND (progress >= 80% OR canGraduate is true)
-        whereClause = and(
-          eq(launchpadToken.graduated, false),
+        conditions.push(eq(launchpadToken.graduated, false));
+        conditions.push(
           or(
             gte(launchpadToken.progress, GRADUATING_THRESHOLD),
             eq(launchpadToken.canGraduate, true)
@@ -52,11 +60,13 @@ launchpad.get("/tokens", async (c: Context) => {
         );
         break;
       case "graduated":
-        whereClause = eq(launchpadToken.graduated, true);
+        conditions.push(eq(launchpadToken.graduated, true));
         break;
-      default: // "all"
-        whereClause = undefined;
+      // "all" - no additional filter
     }
+
+    // Combine all conditions
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Build order by based on sort
     let orderBy;
@@ -183,46 +193,69 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
 
 /**
  * GET /launchpad/stats - Overall launchpad statistics
+ * Query params:
+ *   - chainId: number (optional - filter by chain)
  */
 launchpad.get("/stats", async (c: Context) => {
   try {
+    const chainIdParam = c.req.query("chainId");
+    const chainId = chainIdParam ? parseInt(chainIdParam) : undefined;
+
+    // Build base chain filter condition
+    const chainFilter = chainId !== undefined && !isNaN(chainId)
+      ? eq(launchpadToken.chainId, chainId)
+      : undefined;
+    const tradeChainFilter = chainId !== undefined && !isNaN(chainId)
+      ? eq(launchpadTrade.chainId, chainId)
+      : undefined;
+
     const totalTokensResult = await db
       .select({ count: count() })
-      .from(launchpadToken);
+      .from(launchpadToken)
+      .where(chainFilter);
 
     const graduatedTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
-      .where(eq(launchpadToken.graduated, true));
+      .where(chainFilter
+        ? and(chainFilter, eq(launchpadToken.graduated, true))
+        : eq(launchpadToken.graduated, true)
+      );
 
     // Active = not graduated AND progress < 80%
+    const activeConditions = [
+      eq(launchpadToken.graduated, false),
+      lt(launchpadToken.progress, GRADUATING_THRESHOLD),
+    ];
+    if (chainFilter) activeConditions.unshift(chainFilter);
     const activeTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
-      .where(and(
-        eq(launchpadToken.graduated, false),
-        lt(launchpadToken.progress, GRADUATING_THRESHOLD)
-      ));
+      .where(and(...activeConditions));
 
     // Graduating = not graduated AND (progress >= 80% OR canGraduate is true)
+    const graduatingConditions = [
+      eq(launchpadToken.graduated, false),
+      or(
+        gte(launchpadToken.progress, GRADUATING_THRESHOLD),
+        eq(launchpadToken.canGraduate, true)
+      ),
+    ];
+    if (chainFilter) graduatingConditions.unshift(chainFilter);
     const graduatingTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
-      .where(and(
-        eq(launchpadToken.graduated, false),
-        or(
-          gte(launchpadToken.progress, GRADUATING_THRESHOLD),
-          eq(launchpadToken.canGraduate, true)
-        )
-      ));
+      .where(and(...graduatingConditions));
 
     const totalTradesResult = await db
       .select({ count: count() })
-      .from(launchpadTrade);
+      .from(launchpadTrade)
+      .where(tradeChainFilter);
 
     const totalVolumeResult = await db
       .select({ volume: sql<string>`COALESCE(SUM(${launchpadToken.totalVolumeBase}), 0)::text` })
-      .from(launchpadToken);
+      .from(launchpadToken)
+      .where(chainFilter);
 
     return c.json({
       totalTokens: totalTokensResult[0]?.count || 0,
@@ -242,10 +275,18 @@ launchpad.get("/stats", async (c: Context) => {
  * GET /launchpad/recent-trades - Recent trades across all tokens
  * Query params:
  *   - limit: number (default: 20, max: 50)
+ *   - chainId: number (optional - filter by chain)
  */
 launchpad.get("/recent-trades", async (c: Context) => {
   try {
     const limit = Math.min(50, Math.max(1, parseInt(c.req.query("limit") || "20")));
+    const chainIdParam = c.req.query("chainId");
+    const chainId = chainIdParam ? parseInt(chainIdParam) : undefined;
+
+    // Build chain filter condition
+    const chainFilter = chainId !== undefined && !isNaN(chainId)
+      ? eq(launchpadTrade.chainId, chainId)
+      : undefined;
 
     const trades = await db
       .select({
@@ -262,6 +303,7 @@ launchpad.get("/recent-trades", async (c: Context) => {
       })
       .from(launchpadTrade)
       .leftJoin(launchpadToken, eq(launchpadTrade.tokenAddress, launchpadToken.address))
+      .where(chainFilter)
       .orderBy(desc(launchpadTrade.timestamp))
       .limit(limit);
 
