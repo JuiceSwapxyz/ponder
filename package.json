@@ -27,7 +27,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.4",
     "@juiceswapxyz/launchpad": "^3.0.0",
-    "@juiceswapxyz/sdk-core": "^3.0.1",
+    "@juiceswapxyz/sdk-core": "^3.0.2",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "axios": "^1.12.2",
