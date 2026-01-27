@@ -17,7 +17,7 @@ const cache = new NodeCache({
 
 // Supported chain IDs
 const SUPPORTED_CHAIN_IDS = [5115, 4114]; // Citrea Testnet, Citrea Mainnet
-const DEFAULT_CHAIN_ID = 5115; // Default to testnet for backwards compatibility
+const DEFAULT_CHAIN_ID = 4114; // Default to mainnet
 
 exploreStats.get("/", async (c: Context) => {
   try {
