@@ -126,56 +126,85 @@ ponder.on(
       console.error("Error processing Transfer event:", error);
     }
 
-    // Position ownership
-    try {
-      if (event.args.from !== zeroAddress) return;
-      if (!event.transaction?.hash) {
-        console.warn("Missing transaction data for Transfer event, skipping");
-        return;
+    // Position ownership - handle based on transfer type
+    const from = event.args.from;
+    const to = event.args.to;
+    const tokenId = event.args.tokenId;
+    const positionId = `${chainId}-${tokenId}`;
+
+    // CASE A: MINT - Create new position (from === zeroAddress)
+    if (from === zeroAddress) {
+      try {
+        if (!event.transaction?.hash) {
+          console.warn("Missing transaction data for Transfer event, skipping");
+          return;
+        }
+
+        const txReceipt = await context.client.getTransactionReceipt({
+          hash: event.transaction.hash,
+        });
+
+        // UniswapV3Pool:Mint(address sender, address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1)
+        const uniswapV3PoolMintEventTopic =
+          "0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde";
+
+        const poolMintEvent = txReceipt.logs.find(
+          (log: any) => log.topics[0] === uniswapV3PoolMintEventTopic
+        );
+
+        if (!poolMintEvent) {
+          console.warn("No Mint event found in transaction logs");
+          return;
+        }
+
+        const poolMintEventDecoded = decodeEventLog({
+          abi: UniswapV3PoolAbi,
+          data: poolMintEvent.data,
+          topics: poolMintEvent.topics,
+        });
+
+        if (poolMintEventDecoded.eventName === "Mint") {
+          const mintArgs = poolMintEventDecoded.args as any;
+          await context.db
+            .insert(position)
+            .values({
+              id: positionId,
+              chainId: chainId,
+              owner: getAddress(to),
+              poolAddress: getAddress(poolMintEvent.address),
+              tokenId: tokenId.toString(),
+              tickLower: Number(mintArgs.tickLower),
+              tickUpper: Number(mintArgs.tickUpper),
+              amount0: mintArgs.amount0,
+              amount1: mintArgs.amount1,
+            })
+            .onConflictDoNothing();
+        }
+      } catch (error) {
+        console.error("Error processing position mint:", error);
       }
+      return;
+    }
 
-      const txReceipt = await context.client.getTransactionReceipt({
-        hash: event.transaction.hash,
-      });
-
-      // UniswapV3Pool:Mint(address sender, address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1)
-      const uniswapV3PoolMintEventTopic =
-        "0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde";
-
-      const poolMintEvent = txReceipt.logs.find(
-        (log: any) => log.topics[0] === uniswapV3PoolMintEventTopic
-      );
-
-      if (!poolMintEvent) {
-        console.warn("No Mint event found in transaction logs");
-        return;
-      }
-
-      const poolMintEventDecoded = decodeEventLog({
-        abi: UniswapV3PoolAbi,
-        data: poolMintEvent.data,
-        topics: poolMintEvent.topics,
-      });
-
-      if (poolMintEventDecoded.eventName === "Mint") {
-        const mintArgs = poolMintEventDecoded.args as any;
+    // CASE B: BURN - Mark position owner as zeroAddress (to === zeroAddress)
+    if (to === zeroAddress) {
+      try {
         await context.db
-          .insert(position)
-          .values({
-            id: `${chainId}-${event.args.tokenId}`,
-            chainId: chainId,
-            owner: getAddress(event.args.to),
-            poolAddress: getAddress(poolMintEvent.address),
-            tokenId: event.args.tokenId.toString(),
-            tickLower: Number(mintArgs.tickLower),
-            tickUpper: Number(mintArgs.tickUpper),
-            amount0: mintArgs.amount0,
-            amount1: mintArgs.amount1,
-          })
-          .onConflictDoNothing();
+          .update(position, { id: positionId })
+          .set({ owner: zeroAddress });
+      } catch (error) {
+        console.error("Error processing position burn:", error);
       }
+      return;
+    }
+
+    // CASE C: TRANSFER - Update position owner (from !== 0x0, to !== 0x0)
+    try {
+      await context.db
+        .update(position, { id: positionId })
+        .set({ owner: getAddress(to) });
     } catch (error) {
-      console.error("Error processing Transfer event:", error);
+      console.error("Error updating position owner:", error);
     }
   }
 );
