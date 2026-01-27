@@ -1,16 +1,18 @@
 // @ts-ignore
 import { poolStat, pool, token } from "ponder.schema";
-import { desc, eq, inArray } from "ponder";
+import { desc, eq, inArray, and } from "ponder";
 // @ts-ignore
 import { db } from "ponder:api";
-import { computeTokenStatsByAddress } from "./computeTokenStats";
+import { computeTokenStatsByAddress, getChainName } from "./computeTokenStats";
 import { getAddress } from "viem";
 
-export const computePoolStatsV3 = async () => {
+export const computePoolStatsV3 = async (chainId: number = 5115) => {
+  const chainName = getChainName(chainId);
+
   const bestPools = await db
     .select()
     .from(poolStat)
-    .where(eq(poolStat.type, "all-time"))
+    .where(and(eq(poolStat.type, "all-time"), eq(poolStat.chainId, chainId)))
     .orderBy(desc(poolStat.txCount))
     .limit(20);
 
@@ -18,7 +20,7 @@ export const computePoolStatsV3 = async () => {
   const poolInfos = await db
     .select()
     .from(pool)
-    .where(inArray(pool.address, poolAddresses));
+    .where(and(inArray(pool.address, poolAddresses), eq(pool.chainId, chainId as any)));
 
   const poolMap = new Map(
     poolInfos.map((p: any) => [p.address.toLowerCase(), p])
@@ -31,7 +33,7 @@ export const computePoolStatsV3 = async () => {
   const tokens = await db
     .select()
     .from(token)
-    .where(inArray(token.address, uniqueTokenAddresses as any));
+    .where(and(inArray(token.address, uniqueTokenAddresses as any), eq(token.chainId, chainId)));
 
   const tokenMap: Map<string, any> = new Map(
     tokens.map((t: any) => [t.address.toLowerCase(), t])
@@ -47,11 +49,13 @@ export const computePoolStatsV3 = async () => {
 
       const token0DataWithMock = await computeTokenStatsByAddress(
         poolInfo.token0,
-        tokenMap
+        tokenMap,
+        chainId
       );
       const token1DataWithMock = await computeTokenStatsByAddress(
         poolInfo.token1,
-        tokenMap
+        tokenMap,
+        chainId
       );
 
       return {
@@ -63,7 +67,7 @@ export const computePoolStatsV3 = async () => {
         feeTier: poolInfo.fee.toString(),
         token0: token0DataWithMock,
         token1: token1DataWithMock,
-        chain: "CITREA_TESTNET",
+        chain: chainName,
         protocolVersion: "V3",
         totalLiquidity: {
           value: 0,
