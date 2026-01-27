@@ -6,15 +6,30 @@ import { eq, and } from "ponder";
 import { db } from "ponder:api";
 import { getAddress } from "viem";
 
+// Chain ID to GraphQL chain name mapping
+const CHAIN_ID_TO_NAME: Record<number, string> = {
+  5115: "CITREA_TESTNET",
+  4114: "CITREA_MAINNET",
+};
+
+export const getChainName = (chainId: number): string => {
+  return CHAIN_ID_TO_NAME[chainId] || "CITREA_TESTNET";
+};
+
 export const computeTokenStatsByAddress = async (
   address: string,
-  tokenMap?: Map<string, any>
+  tokenMap?: Map<string, any>,
+  chainId: number = 5115
 ) => {
   const tokenStats = await db
     .select()
     .from(tokenStat)
     .where(
-      and(eq(tokenStat.type, "all-time"), eq(tokenStat.address, getAddress(address)))
+      and(
+        eq(tokenStat.type, "all-time"),
+        eq(tokenStat.address, getAddress(address)),
+        eq(tokenStat.chainId, chainId)
+      )
     )
     .limit(1);
 
@@ -23,8 +38,8 @@ export const computeTokenStatsByAddress = async (
   }
 
   const tokenDataWithMock = tokenMap
-    ? getTokenStatFormatWithMock(address, tokenMap)
-    : await getTokenStatFormatWithMockQuery(address);
+    ? getTokenStatFormatWithMock(address, tokenMap, chainId)
+    : await getTokenStatFormatWithMockQuery(address, chainId);
 
   return {
     timestamp: tokenStats[0].timestamp.toString(),
@@ -34,13 +49,15 @@ export const computeTokenStatsByAddress = async (
   };
 };
 
-export const computeTokenStats = async () => {
+export const computeTokenStats = async (chainId: number = 5115) => {
+  const chainName = getChainName(chainId);
+
   const [tokens, tokenStats] = await Promise.all([
-    db.select().from(token),
+    db.select().from(token).where(eq(token.chainId, chainId)),
     db
       .select()
       .from(tokenStat)
-      .where(eq(tokenStat.type, "all-time")),
+      .where(and(eq(tokenStat.type, "all-time"), eq(tokenStat.chainId, chainId))),
   ]);
 
   const tokenMap: Map<string, any> = new Map(
@@ -55,7 +72,7 @@ export const computeTokenStats = async () => {
   const serializedTokenStats = Array.from(statsMap.values())
     .map((stat: any) => {
       const address = stat.address;
-      const tokenDataWithMock = getTokenStatFormatWithMock(address, tokenMap);
+      const tokenDataWithMock = getTokenStatFormatWithMock(address, tokenMap, chainId);
 
       return {
         timestamp: stat.timestamp.toString(),
@@ -69,16 +86,17 @@ export const computeTokenStats = async () => {
   return serializedTokenStats;
 };
 
-function getTokenStatFormatWithMock(address: string, tokenMap: Map<string, any>) {
+function getTokenStatFormatWithMock(address: string, tokenMap: Map<string, any>, chainId: number = 5115) {
   const tokenData = tokenMap.get(getAddress(address).toLowerCase());
-  
+  const chainName = getChainName(chainId);
+
   if (!tokenData) {
     return null;
   }
 
   const { name, symbol, decimals } = tokenData;
   return {
-    chain: "CITREA_TESTNET",
+    chain: chainName,
     address: address,
     name: name,
     symbol: symbol,
@@ -179,15 +197,21 @@ function getTokenStatFormatWithMock(address: string, tokenMap: Map<string, any>)
   };
 }
 
-async function getTokenStatFormatWithMockQuery(address: string) {
+async function getTokenStatFormatWithMockQuery(address: string, chainId: number = 5115) {
+  const chainName = getChainName(chainId);
+
   const tokenData = await db
     .select()
     .from(token)
-    .where(eq(token.address, getAddress(address)));
+    .where(and(eq(token.address, getAddress(address)), eq(token.chainId, chainId)));
+
+  if (!tokenData || tokenData.length === 0) {
+    return null;
+  }
 
   const { name, symbol, decimals } = tokenData[0];
   return {
-    chain: "CITREA_TESTNET",
+    chain: chainName,
     address: address,
     name: name,
     symbol: symbol,

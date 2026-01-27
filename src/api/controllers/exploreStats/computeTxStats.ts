@@ -1,18 +1,22 @@
-import { desc, eq, inArray } from "ponder";
+import { desc, eq, inArray, and } from "ponder";
 import { token, transactionSwap } from "ponder.schema";
 import { getAddress } from "viem";
 // @ts-ignore
 import { db } from "ponder:api";
+import { getChainName } from "./computeTokenStats";
 
 
-export const computeTxStats = async () => {
+export const computeTxStats = async (chainId: number = 5115) => {
     try {
+      const chainName = getChainName(chainId);
+
       const swaps = await db
         .select()
         .from(transactionSwap)
+        .where(eq(transactionSwap.chainId, chainId))
         .orderBy(desc(transactionSwap.blockTimestamp))
         .limit(50);
-  
+
       const uniqueTokenAddresses = Array.from(
         new Set(
           swaps.flatMap((swap: any) => [
@@ -25,7 +29,10 @@ export const computeTxStats = async () => {
       const tokens = await db
         .select()
         .from(token)
-        .where(inArray(token.address, uniqueTokenAddresses as any));
+        .where(and(
+          inArray(token.address, uniqueTokenAddresses as any),
+          eq(token.chainId, chainId)
+        ));
 
       const tokenMap = new Map(
         tokens.map((t: any) => [t.address.toLowerCase(), t])
@@ -33,7 +40,7 @@ export const computeTxStats = async () => {
 
       const formatAmount = (amount: bigint, decimals: number) =>
         (Number(amount) / Math.pow(10, decimals)).toString();
-  
+
       return swaps.map((swap: any) => {
         const [token0Addr, token1Addr] = [swap.tokenIn, swap.tokenOut].sort();
         const token0Info: any = tokenMap.get(getAddress(token0Addr).toLowerCase());
@@ -48,12 +55,12 @@ export const computeTxStats = async () => {
 
         return {
           hash: swap.txHash,
-          chain: "CITREA_TESTNET",
+          chain: chainName,
           timestamp: Number(swap.blockTimestamp),
           account: swap.from,
           usdValue: { value: 0 },
           token0: {
-            chain: "CITREA_TESTNET",
+            chain: chainName,
             address: token0Info.address,
             symbol: token0Info.symbol,
             decimals: token0Info.decimals,
@@ -68,7 +75,7 @@ export const computeTxStats = async () => {
             ? `-${formatAmount(swap.amountIn, token0Info.decimals)}`
             : formatAmount(swap.amountOut, token0Info.decimals),
           token1: {
-            chain: "CITREA_TESTNET",
+            chain: chainName,
             address: token1Info.address,
             symbol: token1Info.symbol,
             decimals: token1Info.decimals,
