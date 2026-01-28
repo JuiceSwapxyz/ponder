@@ -4,7 +4,7 @@
  * Test script to verify if the Symbol error occurs with Ponder v0.13.0
  *
  * Tests the problematic transaction that caused crashes in v0.7.17:
- * https://explorer.testnet.citrea.xyz/tx/0x89234270e8ace0e3c172ef48cea48a1f0df22a071170bdedc9e07b36721b8630
+ * https://testnet.citreascan.com/tx/0x89234270e8ace0e3c172ef48cea48a1f0df22a071170bdedc9e07b36721b8630
  */
 
 import { createPublicClient, http, parseAbiItem, decodeEventLog } from 'viem';
