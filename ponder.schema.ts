@@ -81,7 +81,7 @@ export const swap = onchainTable("swap", (t) => ({
 
 export const pool = onchainTable("pool", (t) => ({
   id: t.text().primaryKey(),
-  chainId: t.numeric().notNull(),
+  chainId: t.integer().notNull(),
   address: t.text().notNull(),
   token0: t.text().notNull(),
   token1: t.text().notNull(),
