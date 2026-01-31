@@ -11,6 +11,31 @@ import { transactionSwap, launchpadTrade, token, launchpadToken } from "ponder:s
 
 const activity = new Hono();
 
+// Types for query results
+interface SwapResult {
+  id: string;
+  txHash: string;
+  chainId: number;
+  blockNumber: bigint;
+  blockTimestamp: bigint;
+  swapperAddress: string;
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: bigint;
+  amountOut: bigint;
+  tokenInSymbol: string | null;
+  tokenInDecimals: number | null;
+  tokenInName: string | null;
+}
+
+interface TokenMetadata {
+  address: string;
+  chainId: number;
+  symbol: string;
+  decimals: number;
+  name: string;
+}
+
 /**
  * GET /activity/swaps - Get user swap activity (DEX swaps + launchpad trades)
  * Query params:
@@ -101,12 +126,12 @@ activity.get("/swaps", async (c: Context) => {
       .offset(offset);
 
     // Execute both queries in parallel
-    const [swaps, trades] = await Promise.all([swapsPromise, tradesPromise]);
+    const [swaps, trades] = await Promise.all([swapsPromise, tradesPromise]) as [SwapResult[], unknown[]];
 
     // Batch fetch tokenOut metadata (avoid N+1 queries)
-    const uniqueAddresses = [...new Set(swaps.map((s) => s.tokenOut))];
+    const uniqueAddresses = [...new Set(swaps.map((s: SwapResult) => s.tokenOut))];
 
-    const outTokens =
+    const outTokens: TokenMetadata[] =
       uniqueAddresses.length > 0
         ? await db
             .select({
@@ -121,12 +146,12 @@ activity.get("/swaps", async (c: Context) => {
         : [];
 
     // Create lookup map keyed by "address:chainId"
-    const outTokenMap = new Map(
-      outTokens.map((t) => [`${t.address}:${t.chainId}`, t])
+    const outTokenMap = new Map<string, TokenMetadata>(
+      outTokens.map((t: TokenMetadata) => [`${t.address}:${t.chainId}`, t])
     );
 
     // Enrich swaps with tokenOut metadata
-    const swapsWithOutMetadata = swaps.map((swap) => {
+    const swapsWithOutMetadata = swaps.map((swap: SwapResult) => {
       const outToken = outTokenMap.get(`${swap.tokenOut}:${swap.chainId}`);
       return {
         ...swap,
