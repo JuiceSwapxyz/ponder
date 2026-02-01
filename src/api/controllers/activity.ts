@@ -1,7 +1,7 @@
 /**
  * Activity API controller - endpoints for querying user activity (swaps and launchpad trades)
  */
-import { eq, desc, and, count, replaceBigInts, inArray } from "ponder";
+import { eq, desc, and, count, replaceBigInts, sql } from "ponder";
 import { Context, Hono } from "hono";
 import { getAddress, isAddress } from "viem";
 // @ts-ignore
@@ -90,7 +90,7 @@ activity.get("/swaps", async (c: Context) => {
       })
       .from(transactionSwap)
       .leftJoin(token, and(
-        eq(transactionSwap.tokenIn, token.address),
+        sql`LOWER(${transactionSwap.tokenIn}) = LOWER(${token.address})`,
         eq(transactionSwap.chainId, token.chainId)
       ))
       .where(and(...swapConditions))
@@ -117,7 +117,7 @@ activity.get("/swaps", async (c: Context) => {
       })
       .from(launchpadTrade)
       .leftJoin(launchpadToken, and(
-        eq(launchpadTrade.tokenAddress, launchpadToken.address),
+        sql`LOWER(${launchpadTrade.tokenAddress}) = LOWER(${launchpadToken.address})`,
         eq(launchpadTrade.chainId, launchpadToken.chainId)
       ))
       .where(and(...tradeConditions))
@@ -129,10 +129,11 @@ activity.get("/swaps", async (c: Context) => {
     const [swaps, trades] = await Promise.all([swapsPromise, tradesPromise]) as [SwapResult[], unknown[]];
 
     // Batch fetch tokenOut metadata (avoid N+1 queries)
-    const uniqueAddresses = [...new Set(swaps.map((s: SwapResult) => s.tokenOut))];
+    // Normalize addresses to lowercase for case-insensitive matching
+    const uniqueAddressesLower = [...new Set(swaps.map((s: SwapResult) => s.tokenOut.toLowerCase()))];
 
     const outTokens: TokenMetadata[] =
-      uniqueAddresses.length > 0
+      uniqueAddressesLower.length > 0
         ? await db
             .select({
               address: token.address,
@@ -142,17 +143,17 @@ activity.get("/swaps", async (c: Context) => {
               name: token.name,
             })
             .from(token)
-            .where(inArray(token.address, uniqueAddresses))
+            .where(sql`LOWER(${token.address}) IN (${sql.join(uniqueAddressesLower.map(a => sql`${a}`), sql`, `)})`)
         : [];
 
-    // Create lookup map keyed by "address:chainId"
+    // Create lookup map keyed by "lowercase_address:chainId" for case-insensitive lookup
     const outTokenMap = new Map<string, TokenMetadata>(
-      outTokens.map((t: TokenMetadata) => [`${t.address}:${t.chainId}`, t])
+      outTokens.map((t: TokenMetadata) => [`${t.address.toLowerCase()}:${t.chainId}`, t])
     );
 
     // Enrich swaps with tokenOut metadata
     const swapsWithOutMetadata = swaps.map((swap: SwapResult) => {
-      const outToken = outTokenMap.get(`${swap.tokenOut}:${swap.chainId}`);
+      const outToken = outTokenMap.get(`${swap.tokenOut.toLowerCase()}:${swap.chainId}`);
       return {
         ...swap,
         tokenOutSymbol: outToken?.symbol || null,
