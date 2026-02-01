@@ -136,8 +136,9 @@ ponder.on(
 
         const amountIn =
           event.args.amount0 > 0n ? event.args.amount0 : event.args.amount1;
+        // Output amount is always negative in UniswapV3 (tokens leaving the pool), so use abs()
         const amountOut =
-          event.args.amount1 > 0n ? event.args.amount1 : event.args.amount0;
+          event.args.amount0 > 0n ? abs(event.args.amount1) : abs(event.args.amount0);
 
         await context.db.insert(transactionSwap).values({
           id: event.id,
