@@ -16,12 +16,19 @@ const graduatedPools = new Hono();
  * GET /graduated-pools - List all graduated V2 pools
  * Returns pools with token metadata for routing purposes
  * Note: Reserves are returned as "0" - the API layer fetches fresh on-chain reserves
+ * Query params:
+ *   - chainId: Filter pools by chain ID (optional)
  */
 graduatedPools.get("/", async (c: Context) => {
   try {
-    const pools = await db
+    const chainIdParam = c.req.query("chainId");
+    const chainId = chainIdParam ? parseInt(chainIdParam, 10) : undefined;
+
+    // Build query with optional chainId filter
+    const baseQuery = db
       .select({
         pairAddress: graduatedV2Pool.pairAddress,
+        chainId: graduatedV2Pool.chainId,
         token0: graduatedV2Pool.token0,
         token1: graduatedV2Pool.token1,
         launchpadTokenAddress: graduatedV2Pool.launchpadTokenAddress,
@@ -32,8 +39,14 @@ graduatedPools.get("/", async (c: Context) => {
         tokenSymbol: launchpadToken.symbol,
       })
       .from(graduatedV2Pool)
-      .leftJoin(launchpadToken, eq(graduatedV2Pool.launchpadTokenAddress, launchpadToken.address))
-      .orderBy(desc(graduatedV2Pool.createdAt));
+      .leftJoin(launchpadToken, eq(graduatedV2Pool.launchpadTokenAddress, launchpadToken.address));
+
+    // Apply chainId filter if provided
+    const pools = chainId !== undefined && !isNaN(chainId)
+      ? await baseQuery
+          .where(eq(graduatedV2Pool.chainId, chainId))
+          .orderBy(desc(graduatedV2Pool.createdAt))
+      : await baseQuery.orderBy(desc(graduatedV2Pool.createdAt));
 
     // Add zero reserves - API layer will fetch fresh on-chain data if needed
     const poolsWithReserves = pools.map((pool: any) => ({
