@@ -45,9 +45,8 @@ launchpad.get("/tokens", async (c: Context) => {
     // Add status filter
     switch (filter) {
       case "active":
-        // Active = not graduated AND progress < 80%
+        // Active = all non-graduated tokens (includes both regular active and graduating)
         conditions.push(eq(launchpadToken.graduated, false));
-        conditions.push(lt(launchpadToken.progress, GRADUATING_THRESHOLD));
         break;
       case "graduating":
         // Graduating = not graduated AND (progress >= 80% OR canGraduate is true)
@@ -222,10 +221,9 @@ launchpad.get("/stats", async (c: Context) => {
         : eq(launchpadToken.graduated, true)
       );
 
-    // Active = not graduated AND progress < 80%
+    // Active = all non-graduated tokens (includes both regular active and graduating)
     const activeConditions = [
       eq(launchpadToken.graduated, false),
-      lt(launchpadToken.progress, GRADUATING_THRESHOLD),
     ];
     if (chainFilter) activeConditions.unshift(chainFilter);
     const activeTokensResult = await db
