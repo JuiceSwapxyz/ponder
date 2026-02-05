@@ -8,7 +8,7 @@ import { TokenFactoryAbi } from "./abis/TokenFactory";
 import { BondingCurveTokenAbi } from "./abis/BondingCurveToken";
 import { UniswapV2PairAbi } from "./abis/UniswapV2Pair";
 import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
-import { CHAIN_TO_ADDRESSES_MAP, ChainId } from "@juiceswapxyz/sdk-core";
+import { CHAIN_TO_ADDRESSES_MAP, ChainId, V2_FACTORY_ADDRESSES } from "@juiceswapxyz/sdk-core";
 import { parseAbiItem } from "viem";
 
 const LAUNCHPAD_TESTNET_ADDRESSES = LAUNCHPAD_ADDRESSES[5115];
@@ -130,7 +130,7 @@ export default createConfig({
         citreaTestnet: {
           startBlock: START_BLOCK_LAUNCHPAD_TESTNET,
           address: factory({
-            address: "0xfc271758732F5eD3ddF19727B7E29BFC3325370d" as `0x${string}`,
+            address: V2_FACTORY_ADDRESSES[ChainId.CITREA_TESTNET] as `0x${string}`,
             event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),
             parameter: "pair",
           })
@@ -138,7 +138,7 @@ export default createConfig({
         citrea: {
           startBlock: START_BLOCK_LAUNCHPAD_MAINNET,
           address: factory({
-            address: "0x400B27260bc8BbBF740e25B29a24EDf175d9fE56" as `0x${string}`,
+            address: V2_FACTORY_ADDRESSES[ChainId.CITREA_MAINNET] as `0x${string}`,
             event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),
             parameter: "pair",
           })

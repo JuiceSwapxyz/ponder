@@ -55,11 +55,6 @@ ponder.on(
     try {
       const chainId = context.chain.id;
 
-      if (!event.transaction) {
-        console.warn("[V2Pools] Missing transaction data for Swap event, skipping");
-        return;
-      }
-
       const poolAddress = getAddress(event.log.address);
 
       // Volume is the sum of in + out amounts for each token
@@ -82,8 +77,9 @@ ponder.on(
           .set((row: any) => ({
             totalSwaps: row.totalSwaps + 1,
           }));
-      } catch {
+      } catch (err) {
         // Pool may not exist in graduatedV2Pool table (e.g., non-launchpad V2 pools)
+        console.debug("[V2Pools] Could not update graduatedV2Pool for", poolAddress, err);
       }
     } catch (error) {
       console.error("[V2Pools] Error processing Swap event:", error);
