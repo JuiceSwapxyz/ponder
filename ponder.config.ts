@@ -6,6 +6,7 @@ import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager
 import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
 import { TokenFactoryAbi } from "./abis/TokenFactory";
 import { BondingCurveTokenAbi } from "./abis/BondingCurveToken";
+import { UniswapV2PairAbi } from "./abis/UniswapV2Pair";
 import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
 import { CHAIN_TO_ADDRESSES_MAP, ChainId } from "@juiceswapxyz/sdk-core";
 import { parseAbiItem } from "viem";
@@ -119,6 +120,27 @@ export default createConfig({
             address: LAUNCHPAD_MAINNET_ADDRESSES.factory as `0x${string}`,
             event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient, string metadataURI)'),
             parameter: "token",
+          })
+        },
+      },
+    },
+    UniswapV2Pair: {
+      abi: UniswapV2PairAbi as any,
+      chain: {
+        citreaTestnet: {
+          startBlock: START_BLOCK_LAUNCHPAD_TESTNET,
+          address: factory({
+            address: "0xfc271758732F5eD3ddF19727B7E29BFC3325370d" as `0x${string}`,
+            event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),
+            parameter: "pair",
+          })
+        },
+        citrea: {
+          startBlock: START_BLOCK_LAUNCHPAD_MAINNET,
+          address: factory({
+            address: "0x400B27260bc8BbBF740e25B29a24EDf175d9fE56" as `0x${string}`,
+            event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),
+            parameter: "pair",
           })
         },
       },
