@@ -6,8 +6,9 @@ import { NonfungiblePositionManagerAbi } from "./abis/NonfungiblePositionManager
 import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
 import { TokenFactoryAbi } from "./abis/TokenFactory";
 import { BondingCurveTokenAbi } from "./abis/BondingCurveToken";
+import { UniswapV2PairAbi } from "./abis/UniswapV2Pair";
 import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
-import { CHAIN_TO_ADDRESSES_MAP, ChainId } from "@juiceswapxyz/sdk-core";
+import { CHAIN_TO_ADDRESSES_MAP, ChainId, V2_FACTORY_ADDRESSES } from "@juiceswapxyz/sdk-core";
 import { parseAbiItem } from "viem";
 
 const LAUNCHPAD_TESTNET_ADDRESSES = LAUNCHPAD_ADDRESSES[5115];
@@ -119,6 +120,27 @@ export default createConfig({
             address: LAUNCHPAD_MAINNET_ADDRESSES.factory as `0x${string}`,
             event: parseAbiItem('event TokenCreated(address indexed token, address indexed creator, string name, string symbol, address baseAsset, uint256 initialVirtualBaseReserves, address feeRecipient, string metadataURI)'),
             parameter: "token",
+          })
+        },
+      },
+    },
+    UniswapV2Pair: {
+      abi: UniswapV2PairAbi as any,
+      chain: {
+        citreaTestnet: {
+          startBlock: START_BLOCK_LAUNCHPAD_TESTNET,
+          address: factory({
+            address: V2_FACTORY_ADDRESSES[ChainId.CITREA_TESTNET] as `0x${string}`,
+            event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),
+            parameter: "pair",
+          })
+        },
+        citrea: {
+          startBlock: START_BLOCK_LAUNCHPAD_MAINNET,
+          address: factory({
+            address: V2_FACTORY_ADDRESSES[ChainId.CITREA_MAINNET] as `0x${string}`,
+            event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),
+            parameter: "pair",
           })
         },
       },

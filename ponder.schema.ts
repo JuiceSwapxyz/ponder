@@ -215,6 +215,17 @@ export const launchpadTrade = onchainTable("launchpadTrade", (t) => ({
 }));
 
 // V2 pools created when launchpad tokens graduate
+export const v2PoolStat = onchainTable("v2PoolStat", (t) => ({
+  id: t.text().primaryKey(), // poolAddress-type-timestamp
+  chainId: t.integer().notNull(),
+  poolAddress: t.text().notNull(),
+  timestamp: t.bigint().notNull(),
+  txCount: t.integer().notNull(),
+  volume0: t.bigint().notNull(),
+  volume1: t.bigint().notNull(),
+  type: t.text().notNull(), // "1h", "24h", "all-time"
+}));
+
 export const graduatedV2Pool = onchainTable("graduatedV2Pool", (t) => ({
   id: t.text().primaryKey(), // pair address
   pairAddress: t.hex().notNull(),
