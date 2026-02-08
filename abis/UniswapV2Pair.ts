@@ -1,0 +1,14 @@
+export const UniswapV2PairAbi = [
+  {
+    type: "event",
+    name: "Swap",
+    inputs: [
+      { indexed: true, name: "sender", type: "address" },
+      { indexed: false, name: "amount0In", type: "uint256" },
+      { indexed: false, name: "amount1In", type: "uint256" },
+      { indexed: false, name: "amount0Out", type: "uint256" },
+      { indexed: false, name: "amount1Out", type: "uint256" },
+      { indexed: true, name: "to", type: "address" },
+    ],
+  },
+] as const;
