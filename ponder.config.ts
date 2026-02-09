@@ -7,6 +7,10 @@ import { UniswapV3FactoryAbi } from "./abis/UniswapV3Factory";
 import { TokenFactoryAbi } from "./abis/TokenFactory";
 import { BondingCurveTokenAbi } from "./abis/BondingCurveToken";
 import { UniswapV2PairAbi } from "./abis/UniswapV2Pair";
+import { JuiceSwapGovernorAbi } from "./abis/JuiceSwapGovernor";
+import { JuiceSwapFeeCollectorAbi } from "./abis/JuiceSwapFeeCollector";
+import { JuiceSwapGatewayAbi } from "./abis/JuiceSwapGateway";
+import { LayerZeroOFTAbi } from "./abis/LayerZeroOFT";
 import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
 import { CHAIN_TO_ADDRESSES_MAP, ChainId, V2_FACTORY_ADDRESSES } from "@juiceswapxyz/sdk-core";
 import { parseAbiItem } from "viem";
@@ -144,7 +148,59 @@ export default createConfig({
           })
         },
       },
-    }
+    },
+    JuiceSwapGovernor: {
+      abi: JuiceSwapGovernorAbi as any,
+      chain: {
+        citreaTestnet: {
+          address: V3_TESTNET_ADDRESSES.juiceSwapGovernorAddress as `0x${string}`,
+          startBlock: START_BLOCK_TESTNET,
+        },
+        citrea: {
+          address: V3_MAINNET_ADDRESSES.juiceSwapGovernorAddress as `0x${string}`,
+          startBlock: START_BLOCK_MAINNET,
+        },
+      },
+    },
+    JuiceSwapFeeCollector: {
+      abi: JuiceSwapFeeCollectorAbi as any,
+      chain: {
+        citreaTestnet: {
+          address: V3_TESTNET_ADDRESSES.juiceSwapFeeCollectorAddress as `0x${string}`,
+          startBlock: START_BLOCK_TESTNET,
+        },
+        citrea: {
+          address: V3_MAINNET_ADDRESSES.juiceSwapFeeCollectorAddress as `0x${string}`,
+          startBlock: START_BLOCK_MAINNET,
+        },
+      },
+    },
+    JuiceSwapGateway: {
+      abi: JuiceSwapGatewayAbi as any,
+      chain: {
+        citreaTestnet: {
+          address: V3_TESTNET_ADDRESSES.juiceSwapGatewayAddress as `0x${string}`,
+          startBlock: START_BLOCK_TESTNET,
+        },
+        citrea: {
+          address: V3_MAINNET_ADDRESSES.juiceSwapGatewayAddress as `0x${string}`,
+          startBlock: START_BLOCK_MAINNET,
+        },
+      },
+    },
+    LayerZeroOFT: {
+      abi: LayerZeroOFTAbi as any,
+      chain: {
+        citrea: {
+          address: [
+            V3_MAINNET_ADDRESSES.l0UsdcOftAddress as `0x${string}`,
+            V3_MAINNET_ADDRESSES.l0UsdtOftAddress as `0x${string}`,
+            V3_MAINNET_ADDRESSES.l0WbtcOftAddress as `0x${string}`,
+          ],
+          startBlock: START_BLOCK_MAINNET,
+        },
+      },
+    },
   },
   blocks: {
     blockProgress: {
