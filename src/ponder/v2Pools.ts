@@ -4,7 +4,9 @@
  */
 // @ts-ignore
 import { getIdByTemporalFrame, TEMPORAL_FRAMES } from "@/utils/timestamps";
-import { v2PoolStat, graduatedV2Pool } from "ponder.schema";
+import { v2PoolStat, graduatedV2Pool, launchpadToken } from "ponder.schema";
+// @ts-ignore
+import { safeBigInt } from "@/utils/helpers";
 // @ts-ignore
 import { ponder } from "ponder:registry";
 import { getAddress } from "viem";
@@ -70,16 +72,33 @@ ponder.on(
         chainId,
       });
 
-      // Increment totalSwaps on the graduatedV2Pool record
-      try {
+      // Check if this pool is a graduated launchpad token
+      const pool = await context.db.find(graduatedV2Pool, { id: poolAddress });
+      if (pool) {
+        // Increment totalSwaps on the graduatedV2Pool record
         await context.db
           .update(graduatedV2Pool, { id: poolAddress })
           .set((row: any) => ({
             totalSwaps: row.totalSwaps + 1,
           }));
-      } catch (err) {
-        // Pool may not exist in graduatedV2Pool table (e.g., non-launchpad V2 pools)
-        console.debug("[V2Pools] Could not update graduatedV2Pool for", poolAddress, err);
+
+        // Update launchpad token volume & trade counters
+        const isToken0Base = pool.token0.toLowerCase() !== pool.launchpadTokenAddress.toLowerCase();
+        const baseVolume = isToken0Base ? volume0 : volume1;
+
+        // Buy = base asset flows IN (trader sends base, receives token)
+        // Sell = base asset flows OUT (trader sends token, receives base)
+        const baseIn = isToken0Base ? abs(event.args.amount0In) : abs(event.args.amount1In);
+        const isBuy = baseIn > 0n;
+
+        await context.db
+          .update(launchpadToken, { id: pool.launchpadTokenAddress })
+          .set((row: any) => ({
+            totalBuys: isBuy ? row.totalBuys + 1 : row.totalBuys,
+            totalSells: isBuy ? row.totalSells : row.totalSells + 1,
+            totalVolumeBase: row.totalVolumeBase + baseVolume,
+            lastTradeAt: safeBigInt(event.block.timestamp),
+          }));
       }
     } catch (error) {
       console.error("[V2Pools] Error processing Swap event:", error);

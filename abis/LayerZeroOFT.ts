@@ -1,0 +1,70 @@
+export const LayerZeroOFTAbi = [
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "bytes32",
+        name: "guid",
+        type: "bytes32",
+      },
+      {
+        indexed: false,
+        internalType: "uint32",
+        name: "dstEid",
+        type: "uint32",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "fromAddress",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amountSentLD",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amountReceivedLD",
+        type: "uint256",
+      },
+    ],
+    name: "OFTSent",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "bytes32",
+        name: "guid",
+        type: "bytes32",
+      },
+      {
+        indexed: false,
+        internalType: "uint32",
+        name: "srcEid",
+        type: "uint32",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "toAddress",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amountReceivedLD",
+        type: "uint256",
+      },
+    ],
+    name: "OFTReceived",
+    type: "event",
+  },
+] as const;
