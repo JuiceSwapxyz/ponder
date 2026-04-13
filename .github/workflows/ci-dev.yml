@@ -9,7 +9,7 @@ on:
 
 env:
   NODE_VERSION: '20'
-  DOCKER_TAGS: dfxswiss/juiceswap-ponder:beta
+  DOCKER_TAGS: juiceswap/ponder:beta
   DEPLOY_INFO: ${{ github.ref_name }}-${{ github.sha }}
 
 jobs:
