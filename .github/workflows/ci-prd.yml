@@ -5,7 +5,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-
 env:
   NODE_VERSION: '20'
   DOCKER_TAGS: dfxswiss/juiceswap-ponder:latest
@@ -35,13 +34,12 @@ jobs:
         run: npm test
         continue-on-error: true  # Tests not yet implemented
 
-  build-and-push:
-    name: Build and Push Docker Image
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    name: Build and deploy to PRD
+    runs-on: ubuntu-24.04-arm
     needs: test
     permissions:
       contents: read
-      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,11 +49,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -75,3 +68,18 @@ jobs:
             COMMIT_HASH=${{ steps.sha.outputs.short }}
             NODE_ENV=production
 
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/download/2025.4.0/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared
+          chmod +x /usr/local/bin/cloudflared
+
+      - name: Deploy to PRD
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_PRD_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_PRD_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key \
+            -o ProxyCommand="cloudflared access ssh --hostname ${{ secrets.DEPLOY_PRD_HOST }}" \
+            ${{ secrets.DEPLOY_PRD_USER }}@${{ secrets.DEPLOY_PRD_HOST }} \
+            "jsw-ponder"
