@@ -66,7 +66,8 @@ app.get("/api/info", async (c: Context) => {
   return c.json({
     name: "JuiceSwap Ponder",
     version: "1.0.7",
-    chain: "citreaTestnet",
+    chain: "multi",
+    supportedChains: ["citreaTestnet", "citrea"],
     contracts: {
       CBTCNUSDPool: "0x6006797369E2A595D31Df4ab3691044038AAa7FE",
       CBTCcUSDPool: "0xA69De906B9A830Deb64edB97B2eb0848139306d2",
