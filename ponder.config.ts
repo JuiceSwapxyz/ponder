@@ -43,9 +43,20 @@ export default createConfig({
   contracts: {
     FirstSqueezerNFT: {
       abi: FirstSqueezerNFTAbi as any,
-      chain: "citreaTestnet",
-      address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
-      startBlock: "latest",
+      chain: {
+        citreaTestnet: {
+          // Oct 2025 campaign — index from the deployment block so historical Transfers
+          // populate nftOwner. Previously `startBlock: "latest"` left the table empty.
+          address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
+          startBlock: 17129333,
+        },
+        citrea: {
+          // Apr 2026 mainnet deploy; same address as testnet by coincidence (deployer nonce 0 on both chains).
+          // Deploy tx: 0x0106d2126baffb2ae31224829a08a3c5805b30ab0004c0372bfa8aeb7b3c1d35
+          address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
+          startBlock: 6343693,
+        },
+      },
     },
     NonfungiblePositionManager: {
       abi: NonfungiblePositionManagerAbi as any,

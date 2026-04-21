@@ -28,9 +28,10 @@ campaing.get("/progress", async (c) => {
       );
     }
 
-    if (Number(chainId) !== 5115) {
+    const chainIdNum = Number(chainId);
+    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (chainId: 5115) supported" },
+        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
         400
       );
     }
@@ -152,9 +153,10 @@ campaing.post("/progress", async (c) => {
       return c.json({ error: "Missing walletAddress or chainId" }, 400);
     }
 
-    if (chainId !== 5115) {
+    const chainIdNum = Number(chainId);
+    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (chainId: 5115) supported" },
+        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
         400
       );
     }
@@ -270,7 +272,7 @@ campaing.get("/health", async (c) => {
   return c.json({
     status: "OK",
     timestamp: new Date().toISOString(),
-    chains: ["citreaTestnet"],
+    chains: ["citreaTestnet", "citrea"],
     features: ["campaign-progress"],
     version: "1.0.7",
   });
@@ -281,9 +283,10 @@ campaing.get("/addresses", async (c: Context) => {
   try {
     const chainId = c.req.query("chainId") || "5115";
 
-    if (Number(chainId) !== 5115) {
+    const chainIdNum = Number(chainId);
+    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (chainId: 5115) supported" },
+        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
         400
       );
     }
@@ -352,9 +355,10 @@ campaing.get("/stats", async (c: Context) => {
   try {
     const chainId = c.req.query("chainId") || "5115";
 
-    if (Number(chainId) !== 5115) {
+    const chainIdNum = Number(chainId);
+    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (chainId: 5115) supported" },
+        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
         400
       );
     }
@@ -400,9 +404,10 @@ campaing.get("/daily-growth", async (c: Context) => {
     const chainId = c.req.query("chainId") || "5115";
     const days = parseInt(c.req.query("days") || "30");
 
-    if (Number(chainId) !== 5115) {
+    const chainIdNum = Number(chainId);
+    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (chainId: 5115) supported" },
+        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
         400
       );
     }
@@ -496,9 +501,10 @@ campaing.get("/hourly-activity", async (c: Context) => {
     const chainId = c.req.query("chainId") || "5115";
     const hours = parseInt(c.req.query("hours") || "24");
 
-    if (Number(chainId) !== 5115) {
+    const chainIdNum = Number(chainId);
+    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (chainId: 5115) supported" },
+        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
         400
       );
     }
@@ -573,9 +579,10 @@ campaing.get("/hourly-completion-stats", async (c: Context) => {
     const chainId = c.req.query("chainId") || "5115";
     const hours = parseInt(c.req.query("hours") || "168"); // Last 7 days by default
 
-    if (Number(chainId) !== 5115) {
+    const chainIdNum = Number(chainId);
+    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (chainId: 5115) supported" },
+        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
         400
       );
     }
