@@ -43,9 +43,16 @@ export default createConfig({
   contracts: {
     FirstSqueezerNFT: {
       abi: FirstSqueezerNFTAbi as any,
-      chain: "citreaTestnet",
-      address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
-      startBlock: "latest",
+      chain: {
+        citreaTestnet: {
+          address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
+          startBlock: 17129333,
+        },
+        citrea: {
+          address: "0x428B878cB6383216AaDc4e8495037E8d31612621",
+          startBlock: 6343693,
+        },
+      },
     },
     NonfungiblePositionManager: {
       abi: NonfungiblePositionManagerAbi as any,
