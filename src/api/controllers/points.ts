@@ -1,8 +1,8 @@
 /**
- * Points API controller — endpoints powering the JuiceSwap "Juice Points" UI.
+ * Points API controller - endpoints powering the JuiceSwap "Juice Points" UI.
  *
- *   GET /points/:address          → PointsBreakdown for this wallet
- *   GET /points/leaderboard       → Top 100 wallets ranked by total points
+ *   GET /points/:address          -> PointsBreakdown for this wallet
+ *   GET /points/leaderboard       -> Top 100 wallets ranked by total points
  *
  * Anti-exploit guarantees (server-side, browser cannot influence):
  *   - Swap counts come from the `transactionSwap` table, which the indexer only
@@ -13,6 +13,8 @@
  *   - Any swap whose blockNumber is within FINALITY_OFFSET_BLOCKS of the
  *     indexer's latest block is excluded (defence-in-depth against last-second reorgs).
  *   - Per-address daily cap (MAX_SWAP_POINTS_PER_DAY) deters micro-swap farming.
+ *   - Fails closed: if `blockProgress` is unreadable we return 503 instead of
+ *     silently dropping the finality filter.
  *
  * Performance notes:
  *   - Aggregation is pushed into Postgres (CTE + GROUP BY + SUM(LEAST(...)))
@@ -23,7 +25,7 @@
  *   - Address comparison uses the checksum form (no LOWER(...) wrap) so the
  *     index is actually used.
  *
- * Liquidity points are stubbed as 0 in this version — wiring time-weighted
+ * Liquidity points are stubbed as 0 in this version - wiring time-weighted
  * minimum balance (`MIN_LIQUIDITY_USD` over 24h windows in whitelisted pools)
  * requires a per-day position-snapshot table that the indexer does not yet
  * write. This is tracked separately; the response shape is final so the
@@ -49,6 +51,17 @@ const LEADERBOARD_LIMIT = 100;
 const POINTS_CACHE_TTL_S = 30;
 const LEADERBOARD_CACHE_TTL_S = 30;
 
+interface LeaderboardEntry {
+  rank: number;
+  address: string;
+  points: number;
+}
+
+interface LeaderboardPayload {
+  entries: LeaderboardEntry[];
+  updatedAt: number;
+}
+
 const pointsCache = new NodeCache({ stdTTL: POINTS_CACHE_TTL_S, checkperiod: 5, useClones: false });
 const leaderboardCache = new NodeCache({ stdTTL: LEADERBOARD_CACHE_TTL_S, checkperiod: 5, useClones: false });
 
@@ -67,20 +80,28 @@ interface PointsBreakdown {
   };
 }
 
-async function latestFinalizedBlock(): Promise<bigint | null> {
-  try {
-    const rows = await db.select().from(blockProgress).limit(1);
-    if (!rows.length) {
-      return null;
-    }
-    const latest = BigInt(rows[0].blockNumber);
-    return latest > BigInt(FINALITY_OFFSET_BLOCKS)
-      ? latest - BigInt(FINALITY_OFFSET_BLOCKS)
-      : 0n;
-  } catch (err) {
-    console.warn("blockProgress query failed", err);
-    return null;
+class FinalityUnknownError extends Error {
+  constructor() {
+    super("blockProgress unavailable - cannot enforce finality cutoff");
+    this.name = "FinalityUnknownError";
   }
+}
+
+/**
+ * Returns the latest block we are willing to count points for, applying
+ * the finality buffer. Throws FinalityUnknownError if blockProgress cannot
+ * be read - callers should translate that into 503 so we never silently
+ * count unfinalized blocks.
+ */
+async function latestFinalizedBlock(): Promise<bigint> {
+  const rows = await db.select().from(blockProgress).limit(1);
+  if (!rows.length) {
+    throw new FinalityUnknownError();
+  }
+  const latest = BigInt(rows[0].blockNumber);
+  return latest > BigInt(FINALITY_OFFSET_BLOCKS)
+    ? latest - BigInt(FINALITY_OFFSET_BLOCKS)
+    : 0n;
 }
 
 function liquidityPointsStub(): PointsBreakdown["liquidity"] {
@@ -101,13 +122,8 @@ function liquidityPointsStub(): PointsBreakdown["liquidity"] {
  */
 async function computeSwapPoints(
   checksumAddress: string,
-  finalityCutoff: bigint | null,
+  finalityCutoff: bigint,
 ): Promise<{ count: number; points: number }> {
-  const conditions = [eq(transactionSwap.swapperAddress, checksumAddress)];
-  if (finalityCutoff !== null) {
-    conditions.push(lte(transactionSwap.blockNumber, finalityCutoff));
-  }
-
   const dayExpr = sql`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
 
   const dailyCounts = db.$with("daily_counts").as(
@@ -117,7 +133,12 @@ async function computeSwapPoints(
         n: count().as("n"),
       })
       .from(transactionSwap)
-      .where(and(...conditions))
+      .where(
+        and(
+          eq(transactionSwap.swapperAddress, checksumAddress),
+          lte(transactionSwap.blockNumber, finalityCutoff),
+        ),
+      )
       .groupBy(dayExpr),
   );
 
@@ -141,8 +162,10 @@ async function computeSwapPoints(
   };
 }
 
-async function buildBreakdown(checksumAddress: string): Promise<PointsBreakdown> {
-  const finalityCutoff = await latestFinalizedBlock();
+async function buildBreakdown(
+  checksumAddress: string,
+  finalityCutoff: bigint,
+): Promise<PointsBreakdown> {
   const swaps = await computeSwapPoints(checksumAddress, finalityCutoff);
   const liquidity = liquidityPointsStub();
   return {
@@ -153,18 +176,23 @@ async function buildBreakdown(checksumAddress: string): Promise<PointsBreakdown>
 }
 
 points.get("/leaderboard", async (c: Context) => {
-  const cached = leaderboardCache.get<{ entries: any[]; updatedAt: number }>("top");
+  const cached = leaderboardCache.get<LeaderboardPayload>("top");
   if (cached) {
     return c.json(cached);
   }
 
+  let finalityCutoff: bigint;
   try {
-    const finalityCutoff = await latestFinalizedBlock();
-    const baseConditions = [];
-    if (finalityCutoff !== null) {
-      baseConditions.push(lte(transactionSwap.blockNumber, finalityCutoff));
+    finalityCutoff = await latestFinalizedBlock();
+  } catch (err) {
+    if (err instanceof FinalityUnknownError) {
+      return c.json({ error: "Indexer not ready" }, 503);
     }
+    console.error("blockProgress query error", err);
+    return c.json({ error: "Failed to read indexer state" }, 500);
+  }
 
+  try {
     const dayExpr = sql`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
 
     // CTE 1: daily swap count per address.
@@ -176,7 +204,7 @@ points.get("/leaderboard", async (c: Context) => {
           n: count().as("n"),
         })
         .from(transactionSwap)
-        .where(baseConditions.length ? and(...baseConditions) : undefined)
+        .where(lte(transactionSwap.blockNumber, finalityCutoff))
         .groupBy(transactionSwap.swapperAddress, dayExpr),
     );
 
@@ -184,7 +212,7 @@ points.get("/leaderboard", async (c: Context) => {
     const pointsExpr =
       sql<string | number>`sum(least(${dailyCounts.n} * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY}))`;
 
-    const rows = await db
+    const rows: Array<{ addr: string; points: string | number }> = await db
       .with(dailyCounts)
       .select({
         addr: dailyCounts.addr,
@@ -195,12 +223,12 @@ points.get("/leaderboard", async (c: Context) => {
       .orderBy(desc(pointsExpr))
       .limit(LEADERBOARD_LIMIT);
 
-    const entries = rows.map((row: { addr: string; points: string | number }, i: number) => ({
+    const entries: LeaderboardEntry[] = rows.map((row, i) => ({
       rank: i + 1,
       address: String(row.addr).toLowerCase(),
       points: Number(row.points),
     }));
-    const payload = { entries, updatedAt: Date.now() };
+    const payload: LeaderboardPayload = { entries, updatedAt: Date.now() };
     leaderboardCache.set("top", payload);
     return c.json(payload);
   } catch (err) {
@@ -214,7 +242,7 @@ points.get("/:address", async (c: Context) => {
   if (!raw || !isAddress(raw)) {
     return c.json({ error: "Invalid address" }, 400);
   }
-  // Stored in checksum form by the indexer — preserve so the index is used.
+  // Stored in checksum form by the indexer - preserve so the index is used.
   const checksumAddress = getAddress(raw);
   const cacheKey = checksumAddress.toLowerCase();
 
@@ -223,8 +251,19 @@ points.get("/:address", async (c: Context) => {
     return c.json(cached);
   }
 
+  let finalityCutoff: bigint;
   try {
-    const breakdown = await buildBreakdown(checksumAddress);
+    finalityCutoff = await latestFinalizedBlock();
+  } catch (err) {
+    if (err instanceof FinalityUnknownError) {
+      return c.json({ error: "Indexer not ready" }, 503);
+    }
+    console.error("blockProgress query error", err);
+    return c.json({ error: "Failed to read indexer state" }, 500);
+  }
+
+  try {
+    const breakdown = await buildBreakdown(checksumAddress, finalityCutoff);
     pointsCache.set(cacheKey, breakdown);
     return c.json(breakdown);
   } catch (err) {
