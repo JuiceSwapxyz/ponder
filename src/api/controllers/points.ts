@@ -10,9 +10,18 @@
  *     enforced at indexer-handler level). Custom contracts emitting fake `Swap`
  *     events cannot be counted.
  *   - Reverted/uncled txs do not produce logs, so they cannot be counted.
- *   - We exclude any swap whose blockNumber is within FINALITY_OFFSET of the
- *     indexer's latest block (defence-in-depth against last-second reorgs).
- *   - Per-address daily cap (MAX_SWAP_POINTS_PER_DAY) prevents micro-swap farming.
+ *   - Any swap whose blockNumber is within FINALITY_OFFSET_BLOCKS of the
+ *     indexer's latest block is excluded (defence-in-depth against last-second reorgs).
+ *   - Per-address daily cap (MAX_SWAP_POINTS_PER_DAY) deters micro-swap farming.
+ *
+ * Performance notes:
+ *   - Aggregation is pushed into Postgres (CTE + GROUP BY + SUM(LEAST(...)))
+ *     so the API never streams the full swap history into Node memory.
+ *   - Recommended composite index for fastest queries:
+ *       CREATE INDEX IF NOT EXISTS transaction_swap_swapper_block
+ *         ON "transactionSwap" ("swapperAddress", "blockNumber");
+ *   - Address comparison uses the checksum form (no LOWER(...) wrap) so the
+ *     index is actually used.
  *
  * Liquidity points are stubbed as 0 in this version — wiring time-weighted
  * minimum balance (`MIN_LIQUIDITY_USD` over 24h windows in whitelisted pools)
@@ -21,14 +30,14 @@
  * frontend will pick it up automatically once the snapshot indexer ships.
  */
 
-import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
+import { and, count, desc, eq, lte, sql } from "drizzle-orm";
 import { Context, Hono } from "hono";
-import { isAddress } from "viem";
+import { getAddress, isAddress } from "viem";
 import NodeCache from "node-cache";
 // @ts-ignore
 import { db } from "ponder:api";
 // @ts-ignore
-import { transactionSwap, blockProgress } from "ponder:schema";
+import { blockProgress, transactionSwap } from "ponder:schema";
 
 const POINTS_PER_SWAP = 100;
 const POINTS_PER_LIQUIDITY_DAY = 50;
@@ -43,7 +52,7 @@ const LEADERBOARD_CACHE_TTL_S = 30;
 const pointsCache = new NodeCache({ stdTTL: POINTS_CACHE_TTL_S, checkperiod: 5, useClones: false });
 const leaderboardCache = new NodeCache({ stdTTL: LEADERBOARD_CACHE_TTL_S, checkperiod: 5, useClones: false });
 
-const SECONDS_PER_DAY = 86_400n;
+const SECONDS_PER_DAY = 86_400;
 
 const points = new Hono();
 
@@ -74,54 +83,7 @@ async function latestFinalizedBlock(): Promise<bigint | null> {
   }
 }
 
-/**
- * Aggregate finalized swap points for an address with a per-day cap to deter
- * micro-swap farming. Returns total swap points and underlying swap count.
- */
-async function computeSwapPoints(
-  address: string,
-  finalityCutoff: bigint | null,
-): Promise<{ count: number; points: number }> {
-  const conditions = [
-    sql`LOWER(${transactionSwap.swapperAddress}) = LOWER(${address})`,
-  ];
-  if (finalityCutoff !== null) {
-    conditions.push(lte(transactionSwap.blockNumber, finalityCutoff));
-  }
-
-  // Pull just timestamp; aggregate per UTC day in JS (small dataset per wallet).
-  const rows = await db
-    .select({ ts: transactionSwap.blockTimestamp })
-    .from(transactionSwap)
-    .where(and(...conditions));
-
-  if (!rows.length) {
-    return { count: 0, points: 0 };
-  }
-
-  const perDay = new Map<string, number>();
-  for (const row of rows) {
-    const dayKey = String(BigInt(row.ts) / SECONDS_PER_DAY);
-    perDay.set(dayKey, (perDay.get(dayKey) ?? 0) + 1);
-  }
-
-  let totalPoints = 0;
-  for (const dayCount of perDay.values()) {
-    totalPoints += Math.min(dayCount * POINTS_PER_SWAP, MAX_SWAP_POINTS_PER_DAY);
-  }
-  return { count: rows.length, points: totalPoints };
-}
-
-/**
- * Liquidity points scaffold. Returns zeros until the per-day position-snapshot
- * indexer is in place — see file header for what's required to ship this.
- */
-function liquidityPointsStub(): {
-  days: number;
-  points: number;
-  currentUsdValue: number;
-  meetsMinimum: boolean;
-} {
+function liquidityPointsStub(): PointsBreakdown["liquidity"] {
   return {
     days: 0,
     points: 0,
@@ -130,9 +92,58 @@ function liquidityPointsStub(): {
   };
 }
 
-async function buildBreakdown(address: string): Promise<PointsBreakdown> {
+/**
+ * One round-trip per-address aggregation:
+ *   - GROUP BY UTC day to apply MAX_SWAP_POINTS_PER_DAY cap server-side
+ *   - SUM the capped values to a single (swap_count, points) tuple
+ * Index lookup on (swapperAddress) keeps this O(matches) regardless of
+ * total transactionSwap row count.
+ */
+async function computeSwapPoints(
+  checksumAddress: string,
+  finalityCutoff: bigint | null,
+): Promise<{ count: number; points: number }> {
+  const conditions = [eq(transactionSwap.swapperAddress, checksumAddress)];
+  if (finalityCutoff !== null) {
+    conditions.push(lte(transactionSwap.blockNumber, finalityCutoff));
+  }
+
+  const dayExpr = sql`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
+
+  const dailyCounts = db.$with("daily_counts").as(
+    db
+      .select({
+        day: dayExpr.as("day"),
+        n: count().as("n"),
+      })
+      .from(transactionSwap)
+      .where(and(...conditions))
+      .groupBy(dayExpr),
+  );
+
+  const rows = await db
+    .with(dailyCounts)
+    .select({
+      swapCount: sql<string | number>`coalesce(sum(${dailyCounts.n}), 0)`.as(
+        "swap_count",
+      ),
+      points:
+        sql<string | number>`coalesce(sum(least(${dailyCounts.n} * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY})), 0)`.as(
+          "points",
+        ),
+    })
+    .from(dailyCounts);
+
+  const row = rows[0];
+  return {
+    count: Number(row?.swapCount ?? 0),
+    points: Number(row?.points ?? 0),
+  };
+}
+
+async function buildBreakdown(checksumAddress: string): Promise<PointsBreakdown> {
   const finalityCutoff = await latestFinalizedBlock();
-  const swaps = await computeSwapPoints(address, finalityCutoff);
+  const swaps = await computeSwapPoints(checksumAddress, finalityCutoff);
   const liquidity = liquidityPointsStub();
   return {
     total: swaps.points + liquidity.points,
@@ -149,46 +160,45 @@ points.get("/leaderboard", async (c: Context) => {
 
   try {
     const finalityCutoff = await latestFinalizedBlock();
-    const conditions = [];
+    const baseConditions = [];
     if (finalityCutoff !== null) {
-      conditions.push(lte(transactionSwap.blockNumber, finalityCutoff));
+      baseConditions.push(lte(transactionSwap.blockNumber, finalityCutoff));
     }
+
+    const dayExpr = sql`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
+
+    // CTE 1: daily swap count per address.
+    const dailyCounts = db.$with("daily_counts").as(
+      db
+        .select({
+          addr: transactionSwap.swapperAddress,
+          day: dayExpr.as("day"),
+          n: count().as("n"),
+        })
+        .from(transactionSwap)
+        .where(baseConditions.length ? and(...baseConditions) : undefined)
+        .groupBy(transactionSwap.swapperAddress, dayExpr),
+    );
+
+    // Outer: sum capped daily values per address, top N by points DESC.
+    const pointsExpr =
+      sql<string | number>`sum(least(${dailyCounts.n} * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY}))`;
 
     const rows = await db
+      .with(dailyCounts)
       .select({
-        address: sql<string>`LOWER(${transactionSwap.swapperAddress})`.as("addr"),
-        ts: transactionSwap.blockTimestamp,
+        addr: dailyCounts.addr,
+        points: pointsExpr.as("points"),
       })
-      .from(transactionSwap)
-      .where(conditions.length ? and(...conditions) : undefined);
+      .from(dailyCounts)
+      .groupBy(dailyCounts.addr)
+      .orderBy(desc(pointsExpr))
+      .limit(LEADERBOARD_LIMIT);
 
-    const perAddress = new Map<string, number>();
-    const perAddressDays = new Map<string, Map<string, number>>();
-    for (const row of rows) {
-      const addr = row.address;
-      const dayKey = String(BigInt(row.ts) / SECONDS_PER_DAY);
-      let days = perAddressDays.get(addr);
-      if (!days) {
-        days = new Map();
-        perAddressDays.set(addr, days);
-      }
-      days.set(dayKey, (days.get(dayKey) ?? 0) + 1);
-    }
-    for (const [addr, days] of perAddressDays.entries()) {
-      let total = 0;
-      for (const dayCount of days.values()) {
-        total += Math.min(dayCount * POINTS_PER_SWAP, MAX_SWAP_POINTS_PER_DAY);
-      }
-      if (total > 0) {
-        perAddress.set(addr, total);
-      }
-    }
-
-    const sorted = [...perAddress.entries()].sort((a, b) => b[1] - a[1]).slice(0, LEADERBOARD_LIMIT);
-    const entries = sorted.map(([address, p], i) => ({
+    const entries = rows.map((row: { addr: string; points: string | number }, i: number) => ({
       rank: i + 1,
-      address,
-      points: p,
+      address: String(row.addr).toLowerCase(),
+      points: Number(row.points),
     }));
     const payload = { entries, updatedAt: Date.now() };
     leaderboardCache.set("top", payload);
@@ -204,16 +214,18 @@ points.get("/:address", async (c: Context) => {
   if (!raw || !isAddress(raw)) {
     return c.json({ error: "Invalid address" }, 400);
   }
-  const address = raw.toLowerCase();
+  // Stored in checksum form by the indexer — preserve so the index is used.
+  const checksumAddress = getAddress(raw);
+  const cacheKey = checksumAddress.toLowerCase();
 
-  const cached = pointsCache.get<PointsBreakdown>(address);
+  const cached = pointsCache.get<PointsBreakdown>(cacheKey);
   if (cached) {
     return c.json(cached);
   }
 
   try {
-    const breakdown = await buildBreakdown(address);
-    pointsCache.set(address, breakdown);
+    const breakdown = await buildBreakdown(checksumAddress);
+    pointsCache.set(cacheKey, breakdown);
     return c.json(breakdown);
   } catch (err) {
     console.error("points error", err);
