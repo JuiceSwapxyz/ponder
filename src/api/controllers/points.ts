@@ -16,15 +16,6 @@
  *   - Fails closed: if `blockProgress` is unreadable we return 503 instead of
  *     silently dropping the finality filter.
  *
- * Performance notes:
- *   - Aggregation is pushed into Postgres (CTE + GROUP BY + SUM(LEAST(...)))
- *     so the API never streams the full swap history into Node memory.
- *   - Recommended composite index for fastest queries:
- *       CREATE INDEX IF NOT EXISTS transaction_swap_swapper_block
- *         ON "transactionSwap" ("swapperAddress", "blockNumber");
- *   - Address comparison uses the checksum form (no LOWER(...) wrap) so the
- *     index is actually used.
- *
  * Liquidity points are stubbed as 0 in this version - wiring time-weighted
  * minimum balance (`MIN_LIQUIDITY_USD` over 24h windows in whitelisted pools)
  * requires a per-day position-snapshot table that the indexer does not yet
@@ -32,7 +23,7 @@
  * frontend will pick it up automatically once the snapshot indexer ships.
  */
 
-import { and, count, desc, eq, lte, sql } from "drizzle-orm";
+import { and, count, eq, lte, sql } from "drizzle-orm";
 import { Context, Hono } from "hono";
 import { getAddress, isAddress } from "viem";
 import NodeCache from "node-cache";
@@ -62,13 +53,6 @@ interface LeaderboardPayload {
   updatedAt: number;
 }
 
-const pointsCache = new NodeCache({ stdTTL: POINTS_CACHE_TTL_S, checkperiod: 5, useClones: false });
-const leaderboardCache = new NodeCache({ stdTTL: LEADERBOARD_CACHE_TTL_S, checkperiod: 5, useClones: false });
-
-const SECONDS_PER_DAY = 86_400;
-
-const points = new Hono();
-
 interface PointsBreakdown {
   total: number;
   swaps: { count: number; points: number };
@@ -80,6 +64,17 @@ interface PointsBreakdown {
   };
 }
 
+const pointsCache = new NodeCache({ stdTTL: POINTS_CACHE_TTL_S, checkperiod: 5, useClones: false });
+const leaderboardCache = new NodeCache({
+  stdTTL: LEADERBOARD_CACHE_TTL_S,
+  checkperiod: 5,
+  useClones: false,
+});
+
+const SECONDS_PER_DAY = 86_400;
+
+const points = new Hono();
+
 class FinalityUnknownError extends Error {
   constructor() {
     super("blockProgress unavailable - cannot enforce finality cutoff");
@@ -90,8 +85,7 @@ class FinalityUnknownError extends Error {
 /**
  * Returns the latest block we are willing to count points for, applying
  * the finality buffer. Throws FinalityUnknownError if blockProgress cannot
- * be read - callers should translate that into 503 so we never silently
- * count unfinalized blocks.
+ * be read - callers translate that to 503 so unfinalized blocks never count.
  */
 async function latestFinalizedBlock(): Promise<bigint> {
   const rows = await db.select().from(blockProgress).limit(1);
@@ -114,52 +108,41 @@ function liquidityPointsStub(): PointsBreakdown["liquidity"] {
 }
 
 /**
- * One round-trip per-address aggregation:
- *   - GROUP BY UTC day to apply MAX_SWAP_POINTS_PER_DAY cap server-side
- *   - SUM the capped values to a single (swap_count, points) tuple
- * Index lookup on (swapperAddress) keeps this O(matches) regardless of
- * total transactionSwap row count.
+ * Per-address aggregation: GROUP BY UTC day, then apply the daily cap in JS.
+ * The dataset is just one wallet's history, so the row count is bounded by
+ * the number of distinct days that wallet was active.
  */
 async function computeSwapPoints(
   checksumAddress: string,
   finalityCutoff: bigint,
 ): Promise<{ count: number; points: number }> {
-  const dayExpr = sql`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
-
-  const dailyCounts = db.$with("daily_counts").as(
-    db
-      .select({
-        day: dayExpr.as("day"),
-        n: count().as("n"),
-      })
-      .from(transactionSwap)
-      .where(
-        and(
-          eq(transactionSwap.swapperAddress, checksumAddress),
-          lte(transactionSwap.blockNumber, finalityCutoff),
-        ),
-      )
-      .groupBy(dayExpr),
-  );
+  const dayExpr = sql<string>`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
 
   const rows = await db
-    .with(dailyCounts)
     .select({
-      swapCount: sql<string | number>`coalesce(sum(${dailyCounts.n}), 0)`.as(
-        "swap_count",
-      ),
-      points:
-        sql<string | number>`coalesce(sum(least(${dailyCounts.n} * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY})), 0)`.as(
-          "points",
-        ),
+      day: dayExpr,
+      n: count(),
     })
-    .from(dailyCounts);
+    .from(transactionSwap)
+    .where(
+      and(
+        eq(transactionSwap.swapperAddress, checksumAddress),
+        lte(transactionSwap.blockNumber, finalityCutoff),
+      ),
+    )
+    .groupBy(dayExpr);
 
-  const row = rows[0];
-  return {
-    count: Number(row?.swapCount ?? 0),
-    points: Number(row?.points ?? 0),
-  };
+  let totalCount = 0;
+  let totalPoints = 0;
+  for (const row of rows) {
+    const n = Number((row as { n: number | string | bigint }).n);
+    if (!Number.isFinite(n)) {
+      continue;
+    }
+    totalCount += n;
+    totalPoints += Math.min(n * POINTS_PER_SWAP, MAX_SWAP_POINTS_PER_DAY);
+  }
+  return { count: totalCount, points: totalPoints };
 }
 
 async function buildBreakdown(
@@ -193,41 +176,40 @@ points.get("/leaderboard", async (c: Context) => {
   }
 
   try {
-    const dayExpr = sql`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
+    // Raw CTE: GROUP BY (address, day) -> SUM(LEAST(n*100, 1000)) per address.
+    // Postgres returns just the top N rows; aggregation never streams to Node.
+    const rawResult: any = await db.execute(sql`
+      WITH daily_counts AS (
+        SELECT
+          ${transactionSwap.swapperAddress} AS addr,
+          FLOOR(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY}) AS day,
+          COUNT(*)::int AS n
+        FROM ${transactionSwap}
+        WHERE ${transactionSwap.blockNumber} <= ${finalityCutoff}
+        GROUP BY ${transactionSwap.swapperAddress},
+                 FLOOR(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})
+      )
+      SELECT
+        addr,
+        SUM(LEAST(n * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY}))::bigint AS points
+      FROM daily_counts
+      GROUP BY addr
+      HAVING SUM(LEAST(n * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY})) > 0
+      ORDER BY points DESC
+      LIMIT ${LEADERBOARD_LIMIT}
+    `);
 
-    // CTE 1: daily swap count per address.
-    const dailyCounts = db.$with("daily_counts").as(
-      db
-        .select({
-          addr: transactionSwap.swapperAddress,
-          day: dayExpr.as("day"),
-          n: count().as("n"),
-        })
-        .from(transactionSwap)
-        .where(lte(transactionSwap.blockNumber, finalityCutoff))
-        .groupBy(transactionSwap.swapperAddress, dayExpr),
-    );
-
-    // Outer: sum capped daily values per address, top N by points DESC.
-    const pointsExpr =
-      sql<string | number>`sum(least(${dailyCounts.n} * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY}))`;
-
-    const rows: Array<{ addr: string; points: string | number }> = await db
-      .with(dailyCounts)
-      .select({
-        addr: dailyCounts.addr,
-        points: pointsExpr.as("points"),
-      })
-      .from(dailyCounts)
-      .groupBy(dailyCounts.addr)
-      .orderBy(desc(pointsExpr))
-      .limit(LEADERBOARD_LIMIT);
+    // db.execute can return rows directly (postgres-js) or wrapped {rows:[...]} (pg).
+    const rows: Array<{ addr: string; points: number | string | bigint }> = Array.isArray(rawResult)
+      ? rawResult
+      : (rawResult?.rows ?? []);
 
     const entries: LeaderboardEntry[] = rows.map((row, i) => ({
       rank: i + 1,
       address: String(row.addr).toLowerCase(),
       points: Number(row.points),
     }));
+
     const payload: LeaderboardPayload = { entries, updatedAt: Date.now() };
     leaderboardCache.set("top", payload);
     return c.json(payload);
