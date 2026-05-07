@@ -17,6 +17,7 @@ import launchpad from "./controllers/launchpad";
 import graduatedPools from "./controllers/graduatedPools";
 import activity from "./controllers/activity";
 import v2PoolStats from "./controllers/v2PoolStats";
+import points from "./controllers/points";
 import { blockProgress } from "ponder.schema";
 
 // Import middleware
@@ -60,6 +61,7 @@ app.route("/launchpad", launchpad);
 app.route("/graduated-pools", graduatedPools);
 app.route("/activity", activity);
 app.route("/v2-pool-stats", v2PoolStats);
+app.route("/points", points);
 
 // Info endpoint
 app.get("/api/info", async (c: Context) => {
