@@ -9,13 +9,19 @@
  *                  daily-capped at MAX_SWAP_POINTS_PER_DAY per address.
  *   - liquidity  — POINTS_PER_LIQUIDITY_DAY per UTC day a wallet held ≥ $10
  *                  of LP in whitelisted pools throughout the whole 24h window.
- *   - bonuses    — one-time stacking bonuses on Citrea Mainnet:
- *                       500 JP for creating at least one launchpad meme token
- *                    10,000 JP for that wallet's token graduating (bonding
- *                                  curve filled → V2 pair created)
- *                  Also drives the Juicer NFT "create meme token"
- *                  requirement (campaign backend reads
- *                  `bonuses.memeTokenCreated`).
+ *   - bonuses    — mix of one-time and daily-running bonuses:
+ *                       500 JP one-time for creating a launchpad meme token
+ *                    10,000 JP one-time for graduating one (bonding curve
+ *                                  filled → V2 pair created)
+ *                         1 JP / JUSD / day held in the Savings Vault (svJUSD)
+ *                         1 JP / 10 JUICE / day held in wallet
+ *                         5 JP / $1 / day minted on the JUSD Minting Hub
+ *                  Daily streams use the same "credit every fully-covered UTC
+ *                  day at the wallet's MIN balance during that day" rule as
+ *                  the LP tracker — a single moment below the threshold
+ *                  breaks the streak for that day (anti-exploit).
+ *                  `bonuses.memeTokenCreated` also drives the Juicer NFT
+ *                  "create meme token" requirement.
  *
  * Anti-exploit guarantees (server-side, browser cannot influence):
  *   - Swap counts come from `transactionSwap`, which the indexer only writes
@@ -39,24 +45,32 @@
  * variant serialised to a malformed query and the endpoint returned 500.
  */
 
-import { and, count, eq, lte, sql } from "drizzle-orm";
+import { and, count, eq, lte, sql, sum } from "drizzle-orm";
 import { Context, Hono } from "hono";
 import { getAddress, isAddress } from "viem";
 import NodeCache from "node-cache";
 // @ts-ignore
 import { db } from "ponder:api";
+// prettier-ignore
 // @ts-ignore
-import { blockProgress, launchpadToken, lpDayCredit, lpPositionWallet, transactionSwap } from "ponder:schema";
+import { blockProgress, juiceHoldDayCredit, juiceHoldWallet, launchpadToken, lendingDayCredit, lendingWallet, lpDayCredit, lpPositionWallet, savingsDayCredit, savingsWallet, transactionSwap } from "ponder:schema";
 
 const POINTS_PER_SWAP = 100;
 const POINTS_PER_LIQUIDITY_DAY = 50;
 const POINTS_PER_MEME_TOKEN_CREATED = 500; // one-time bonus per wallet per chain
 const POINTS_PER_MEME_TOKEN_GRADUATED = 10_000; // one-time bonus per wallet per chain
+// Daily-earning rates (per UTC day, computed in `points.ts`).
+const POINTS_PER_JUICE_PER_DAY = 1n;   // 1 JP per 10 JUICE per day = floor(JUICE/10)
+const JUICE_PER_POINT = 10n;
+const POINTS_PER_JUSD_SAVED_PER_DAY = 1n;
+const POINTS_PER_USD_LENT_PER_DAY = 5n;
 const MIN_LIQUIDITY_USD = 10;
 const MIN_LIQUIDITY_USD_CENTS = 1_000; // = $10.00
 const MAX_SWAP_POINTS_PER_DAY = 1_000; // = 10 swaps per UTC day per address
 const FINALITY_OFFSET_BLOCKS = 32;
 const LEADERBOARD_LIMIT = 100;
+const LIVE_TAIL_CAP_DAYS = 365;
+const ONE_TOKEN_18 = 10n ** 18n;
 
 // Chain that the Juicer NFT campaign treats as canonical for the
 // "create meme token" requirement. Token launches on other chains do NOT
@@ -109,7 +123,27 @@ interface PointsBreakdown {
     /** One-time JP for graduating a meme token. */
     memeTokenGraduatedPoints: number;
 
-    /** Sum of all bonus categories (meme creation + graduation, for now). */
+    /**
+     * Daily-running JUSD savings. `jusdSaved` is the wallet's current svJUSD
+     * balance (rounded down to whole JUSD); `points` is the accumulated JP
+     * across all credited UTC days at 1 JP per JUSD per day.
+     */
+    savings: { jusdSaved: number; points: number };
+
+    /**
+     * Daily-running JUICE holdings. 1 JP per 10 JUICE per UTC day.
+     * `juiceHeld` is the current floor(balance / 1e18) whole JUICE count.
+     */
+    juiceHold: { juiceHeld: number; points: number };
+
+    /**
+     * Daily-running JUSD lending (Minting Hub). `usdLent` is the wallet's
+     * aggregate minted JUSD principal across all open Position contracts
+     * (rounded down to whole JUSD = whole $). 5 JP per $1 per UTC day.
+     */
+    lending: { usdLent: number; points: number };
+
+    /** Sum of all bonus categories. */
     points: number;
   };
 }
@@ -271,7 +305,12 @@ async function computeLpPoints(
  */
 async function computeMemeTokenBonus(
   checksumAddress: string,
-): Promise<PointsBreakdown["bonuses"]> {
+): Promise<{
+  memeTokenCreated: boolean;
+  memeTokenPoints: number;
+  memeTokenGraduated: boolean;
+  memeTokenGraduatedPoints: number;
+}> {
   const rawResult: any = await db.execute(sql`
     SELECT
       EXISTS (
@@ -293,31 +332,177 @@ async function computeMemeTokenBonus(
 
   const created = !!row.created;
   const graduated = !!row.graduated;
-  const memeTokenPoints = created ? POINTS_PER_MEME_TOKEN_CREATED : 0;
-  const memeTokenGraduatedPoints = graduated ? POINTS_PER_MEME_TOKEN_GRADUATED : 0;
   return {
     memeTokenCreated: created,
-    memeTokenPoints,
+    memeTokenPoints: created ? POINTS_PER_MEME_TOKEN_CREATED : 0,
     memeTokenGraduated: graduated,
-    memeTokenGraduatedPoints,
-    points: memeTokenPoints + memeTokenGraduatedPoints,
+    memeTokenGraduatedPoints: graduated ? POINTS_PER_MEME_TOKEN_GRADUATED : 0,
   };
+}
+
+/**
+ * Returns the wallet's daily-running balance metric for one of the daily
+ * earning streams (savings / juiceHold / lending). All three streams use the
+ * same schema shape:
+ *
+ *   walletTable.balance                — current raw token balance
+ *   walletTable.lastEventTimestamp     — for live-tail computation
+ *   dayCreditTable.{minJuiceUnits|minJusdUnits}
+ *                                      — per-day floor(balance / 10^18) credit
+ *
+ * We aggregate the historical day-credit rows with SUM, then add a capped
+ * live-tail at the wallet's current whole-token balance.
+ */
+async function computeDailyHoldStream(opts: {
+  checksumAddress: string;
+  walletTable: any;
+  walletAddressField: any;
+  walletBalanceField: any;
+  walletLastTsField: any;
+  dayCreditTable: any;
+  dayCreditMinUnitsField: any;
+  dayCreditWalletField: any;
+  pointsPerWholeTokenPerDay: bigint;
+  /** Pre-divisor on whole tokens (e.g. 10 for "1 JP per 10 JUICE per day"). */
+  wholeTokensPerPoint?: bigint;
+}): Promise<{ wholeTokens: number; points: number }> {
+  const {
+    checksumAddress,
+    walletTable,
+    walletAddressField,
+    walletBalanceField,
+    walletLastTsField,
+    dayCreditTable,
+    dayCreditMinUnitsField,
+    dayCreditWalletField,
+    pointsPerWholeTokenPerDay,
+    wholeTokensPerPoint,
+  } = opts;
+
+  // 1) Historical: sum of minUnits across all credited days.
+  const sumRow: any[] = await db
+    .select({ s: sum(dayCreditMinUnitsField) })
+    .from(dayCreditTable)
+    .where(eq(dayCreditWalletField, checksumAddress));
+  const historicalUnits = BigInt(sumRow[0]?.s ?? 0);
+
+  // 2) Live tail: balance × completed-days since lastEventTimestamp.
+  const walletRows: any[] = await db
+    .select({ balance: walletBalanceField, lastEventTimestamp: walletLastTsField })
+    .from(walletTable)
+    .where(eq(walletAddressField, checksumAddress))
+    .limit(1);
+
+  const rawBalance = BigInt(walletRows[0]?.balance ?? 0);
+  const lastEventTs = BigInt(walletRows[0]?.lastEventTimestamp ?? 0);
+  const wholeBalance = rawBalance / ONE_TOKEN_18;
+
+  const nowSec = BigInt(Math.floor(Date.now() / 1_000));
+  const SPD = BigInt(86_400);
+  let liveDays = 0n;
+  if (wholeBalance > 0n && lastEventTs > 0n) {
+    const dMin = (lastEventTs + SPD - 1n) / SPD;
+    const dMax = nowSec / SPD - 1n;
+    if (dMax >= dMin) {
+      liveDays = dMax - dMin + 1n;
+      if (liveDays > BigInt(LIVE_TAIL_CAP_DAYS)) {
+        liveDays = BigInt(LIVE_TAIL_CAP_DAYS);
+      }
+    }
+  }
+  const liveUnits = wholeBalance * liveDays;
+  const totalUnits = historicalUnits + liveUnits;
+
+  // points = (totalUnits / wholeTokensPerPoint) * pointsPerWholeTokenPerDay
+  const divisor = wholeTokensPerPoint ?? 1n;
+  const points = (totalUnits / divisor) * pointsPerWholeTokenPerDay;
+  return {
+    wholeTokens: Number(wholeBalance),
+    points: Number(points),
+  };
+}
+
+async function computeSavingsBonus(
+  checksumAddress: string,
+): Promise<{ jusdSaved: number; points: number }> {
+  const { wholeTokens, points } = await computeDailyHoldStream({
+    checksumAddress,
+    walletTable: savingsWallet,
+    walletAddressField: savingsWallet.walletAddress,
+    walletBalanceField: savingsWallet.balance,
+    walletLastTsField: savingsWallet.lastEventTimestamp,
+    dayCreditTable: savingsDayCredit,
+    dayCreditMinUnitsField: savingsDayCredit.minJusdUnits,
+    dayCreditWalletField: savingsDayCredit.walletAddress,
+    pointsPerWholeTokenPerDay: POINTS_PER_JUSD_SAVED_PER_DAY,
+  });
+  return { jusdSaved: wholeTokens, points };
+}
+
+async function computeJuiceHoldBonus(
+  checksumAddress: string,
+): Promise<{ juiceHeld: number; points: number }> {
+  const { wholeTokens, points } = await computeDailyHoldStream({
+    checksumAddress,
+    walletTable: juiceHoldWallet,
+    walletAddressField: juiceHoldWallet.walletAddress,
+    walletBalanceField: juiceHoldWallet.balance,
+    walletLastTsField: juiceHoldWallet.lastEventTimestamp,
+    dayCreditTable: juiceHoldDayCredit,
+    dayCreditMinUnitsField: juiceHoldDayCredit.minJuiceUnits,
+    dayCreditWalletField: juiceHoldDayCredit.walletAddress,
+    pointsPerWholeTokenPerDay: POINTS_PER_JUICE_PER_DAY,
+    wholeTokensPerPoint: JUICE_PER_POINT,
+  });
+  return { juiceHeld: wholeTokens, points };
+}
+
+async function computeLendingBonus(
+  checksumAddress: string,
+): Promise<{ usdLent: number; points: number }> {
+  const { wholeTokens, points } = await computeDailyHoldStream({
+    checksumAddress,
+    walletTable: lendingWallet,
+    walletAddressField: lendingWallet.walletAddress,
+    walletBalanceField: lendingWallet.totalPrincipalJusd,
+    walletLastTsField: lendingWallet.lastEventTimestamp,
+    dayCreditTable: lendingDayCredit,
+    dayCreditMinUnitsField: lendingDayCredit.minJusdUnits,
+    dayCreditWalletField: lendingDayCredit.walletAddress,
+    pointsPerWholeTokenPerDay: POINTS_PER_USD_LENT_PER_DAY,
+  });
+  return { usdLent: wholeTokens, points };
 }
 
 async function buildBreakdown(
   checksumAddress: string,
   finalityCutoff: bigint,
 ): Promise<PointsBreakdown> {
-  const [swaps, liquidity, bonuses] = await Promise.all([
+  const [swaps, liquidity, meme, savings, juiceHold, lending] = await Promise.all([
     computeSwapPoints(checksumAddress, finalityCutoff),
     computeLpPoints(checksumAddress),
     computeMemeTokenBonus(checksumAddress),
+    computeSavingsBonus(checksumAddress),
+    computeJuiceHoldBonus(checksumAddress),
+    computeLendingBonus(checksumAddress),
   ]);
+  const bonusesPoints =
+    meme.memeTokenPoints +
+    meme.memeTokenGraduatedPoints +
+    savings.points +
+    juiceHold.points +
+    lending.points;
   return {
-    total: swaps.points + liquidity.points + bonuses.points,
+    total: swaps.points + liquidity.points + bonusesPoints,
     swaps,
     liquidity,
-    bonuses,
+    bonuses: {
+      ...meme,
+      savings,
+      juiceHold,
+      lending,
+      points: bonusesPoints,
+    },
   };
 }
 
@@ -431,9 +616,14 @@ export const POINTS_CONFIG = {
   POINTS_PER_LIQUIDITY_DAY,
   POINTS_PER_MEME_TOKEN_CREATED,
   POINTS_PER_MEME_TOKEN_GRADUATED,
+  POINTS_PER_JUSD_SAVED_PER_DAY: 1,
+  POINTS_PER_JUICE_PER_DAY: 1,
+  JUICE_PER_POINT: 10,
+  POINTS_PER_USD_LENT_PER_DAY: 5,
   MIN_LIQUIDITY_USD,
   MAX_SWAP_POINTS_PER_DAY,
   FINALITY_OFFSET_BLOCKS,
   LEADERBOARD_LIMIT,
+  LIVE_TAIL_CAP_DAYS,
   JUICER_CAMPAIGN_CHAIN_ID,
 };

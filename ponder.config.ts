@@ -11,9 +11,32 @@ import { JuiceSwapGovernorAbi } from "./abis/JuiceSwapGovernor";
 import { JuiceSwapFeeCollectorAbi } from "./abis/JuiceSwapFeeCollector";
 import { JuiceSwapGatewayAbi } from "./abis/JuiceSwapGateway";
 import { LayerZeroOFTAbi } from "./abis/LayerZeroOFT";
+import { JuiceErc20Abi } from "./abis/JuiceErc20";
+import { JusdMintingHubAbi, JusdPositionAbi } from "./abis/JusdLending";
 import { ADDRESS as LAUNCHPAD_ADDRESSES } from "@juiceswapxyz/launchpad";
 import { CHAIN_TO_ADDRESSES_MAP, ChainId, V2_FACTORY_ADDRESSES } from "@juiceswapxyz/sdk-core";
 import { parseAbiItem } from "viem";
+
+// JuiceDollar protocol addresses (mirrored from @juicedollar/jusd address.config).
+// Inlined here so we avoid pulling in the .ts source via a node_modules deep import.
+const JUSD_ADDRESSES = {
+  4114: {
+    juice: "0x2A36f2b204B46Fd82653cd06d00c7fF757C99ae4",
+    savingsVaultJUSD: "0x1b70ae756b1089cc5948e4f8a2AD498DF30E897d",
+    mintingHubGateway: "0x1a20B160bf546774246C7920939E6e7Ac0f88b8e",
+  },
+  5115: {
+    juice: "0x7fa131991c8A7d8C21b11391C977Fc7c4c8e0D5E",
+    savingsVaultJUSD: "0x802a29bD29f02c8C477Af5362f9ba88FAe39Cc7B",
+    mintingHubGateway: "0x5fC684074fBaAE37Eb68d3e48D85f485CE5060F8",
+  },
+} as const;
+
+// JuiceDollar contract deployment blocks (confirmed via eth_getCode binary search).
+//   Mainnet: JUICE @ 2,650,850, svJUSD @ 2,650,852, MintingHub @ 2,650,852
+//   Testnet: JUICE @ 21,254,029, svJUSD @ 21,254,031, MintingHub @ 21,254,030
+const START_BLOCK_JUSD_MAINNET = 2650850;
+const START_BLOCK_JUSD_TESTNET = 21254029;
 
 const LAUNCHPAD_TESTNET_ADDRESSES = LAUNCHPAD_ADDRESSES[5115];
 const LAUNCHPAD_MAINNET_ADDRESSES = LAUNCHPAD_ADDRESSES[4114];
@@ -222,6 +245,83 @@ export default createConfig({
             V3_MAINNET_ADDRESSES.l0WbtcOftAddress as `0x${string}`,
           ],
           startBlock: START_BLOCK_MAINNET,
+        },
+      },
+    },
+
+    // JUICE token (equity) — Hold X JUICE = X/10 JP per UTC day.
+    JuiceEquity: {
+      abi: JuiceErc20Abi,
+      chain: {
+        citreaTestnet: {
+          address: JUSD_ADDRESSES[5115].juice as `0x${string}`,
+          startBlock: START_BLOCK_JUSD_TESTNET,
+        },
+        citrea: {
+          address: JUSD_ADDRESSES[4114].juice as `0x${string}`,
+          startBlock: START_BLOCK_JUSD_MAINNET,
+        },
+      },
+    },
+
+    // svJUSD (savings vault) — every svJUSD held = 1 JP per UTC day.
+    // (We treat svJUSD 1:1 with JUSD for the JP math — the small accrued
+    //  interest doesn't change the order of magnitude of the reward.)
+    SavingsVaultJUSD: {
+      abi: JuiceErc20Abi,
+      chain: {
+        citreaTestnet: {
+          address: JUSD_ADDRESSES[5115].savingsVaultJUSD as `0x${string}`,
+          startBlock: START_BLOCK_JUSD_TESTNET,
+        },
+        citrea: {
+          address: JUSD_ADDRESSES[4114].savingsVaultJUSD as `0x${string}`,
+          startBlock: START_BLOCK_JUSD_MAINNET,
+        },
+      },
+    },
+
+    // JUSD Minting Hub gateway — emits PositionOpened so the factory pattern
+    // can spawn per-Position indexing below. Drives the "Lend with a JUSD
+    // position" daily reward.
+    MintingHubGateway: {
+      abi: JusdMintingHubAbi,
+      chain: {
+        citreaTestnet: {
+          address: JUSD_ADDRESSES[5115].mintingHubGateway as `0x${string}`,
+          startBlock: START_BLOCK_JUSD_TESTNET,
+        },
+        citrea: {
+          address: JUSD_ADDRESSES[4114].mintingHubGateway as `0x${string}`,
+          startBlock: START_BLOCK_JUSD_MAINNET,
+        },
+      },
+    },
+
+    // Each individual Position contract spawned by the Minting Hub. Position
+    // address comes from the PositionOpened event's `position` arg.
+    JusdPosition: {
+      abi: JusdPositionAbi,
+      chain: {
+        citreaTestnet: {
+          startBlock: START_BLOCK_JUSD_TESTNET,
+          address: factory({
+            address: JUSD_ADDRESSES[5115].mintingHubGateway as `0x${string}`,
+            event: parseAbiItem(
+              "event PositionOpened(address indexed owner, address indexed position, address original, address collateral)",
+            ),
+            parameter: "position",
+          }),
+        },
+        citrea: {
+          startBlock: START_BLOCK_JUSD_MAINNET,
+          address: factory({
+            address: JUSD_ADDRESSES[4114].mintingHubGateway as `0x${string}`,
+            event: parseAbiItem(
+              "event PositionOpened(address indexed owner, address indexed position, address original, address collateral)",
+            ),
+            parameter: "position",
+          }),
         },
       },
     },
