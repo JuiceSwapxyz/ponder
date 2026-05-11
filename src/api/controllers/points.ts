@@ -9,10 +9,13 @@
  *                  daily-capped at MAX_SWAP_POINTS_PER_DAY per address.
  *   - liquidity  — POINTS_PER_LIQUIDITY_DAY per UTC day a wallet held ≥ $10
  *                  of LP in whitelisted pools throughout the whole 24h window.
- *   - bonuses    — one-time bonuses. Currently: 500 JP for creating at least
- *                  one launchpad meme token on Citrea Mainnet. Also drives
- *                  the Juicer NFT "create meme token" requirement (campaign
- *                  backend reads `bonuses.memeTokenCreated`).
+ *   - bonuses    — one-time stacking bonuses on Citrea Mainnet:
+ *                    500 JP for creating at least one launchpad meme token
+ *                    500 JP for that wallet's token graduating (bonding
+ *                                 curve filled → V2 pair created)
+ *                  Also drives the Juicer NFT "create meme token"
+ *                  requirement (campaign backend reads
+ *                  `bonuses.memeTokenCreated`).
  *
  * Anti-exploit guarantees (server-side, browser cannot influence):
  *   - Swap counts come from `transactionSwap`, which the indexer only writes
@@ -48,6 +51,7 @@ import { blockProgress, launchpadToken, lpDayCredit, lpPositionWallet, transacti
 const POINTS_PER_SWAP = 100;
 const POINTS_PER_LIQUIDITY_DAY = 50;
 const POINTS_PER_MEME_TOKEN_CREATED = 500; // one-time bonus per wallet per chain
+const POINTS_PER_MEME_TOKEN_GRADUATED = 500; // one-time bonus per wallet per chain
 const MIN_LIQUIDITY_USD = 10;
 const MIN_LIQUIDITY_USD_CENTS = 1_000; // = $10.00
 const MAX_SWAP_POINTS_PER_DAY = 1_000; // = 10 swaps per UTC day per address
@@ -93,12 +97,19 @@ interface PointsBreakdown {
      * flag instead of duplicating the chain lookup.
      */
     memeTokenCreated: boolean;
-    /**
-     * One-time JP awarded for creating a meme token. Counted once per wallet
-     * regardless of how many tokens that wallet has launched.
-     */
+    /** One-time JP for creating a meme token, regardless of total launches. */
     memeTokenPoints: number;
-    /** Sum of all bonus categories — for now == memeTokenPoints. */
+
+    /**
+     * `true` once at least one of the wallet's launchpad tokens has
+     * graduated (bonding curve filled → V2 pair) on Citrea Mainnet. Rewards
+     * the harder-to-fake outcome of a successful curve completion.
+     */
+    memeTokenGraduated: boolean;
+    /** One-time JP for graduating a meme token. */
+    memeTokenGraduatedPoints: number;
+
+    /** Sum of all bonus categories (meme creation + graduation, for now). */
     points: number;
   };
 }
@@ -240,30 +251,56 @@ async function computeLpPoints(
 }
 
 /**
- * Has the wallet created at least one launchpad token on Citrea Mainnet?
- * One row from `launchpadToken` is enough — the bonus is one-time per wallet
- * regardless of how many tokens were launched.
+ * Two stacking one-time bonuses driven by the wallet's launchpad activity
+ * on Citrea Mainnet:
+ *
+ *   memeTokenCreated   — `true` if `launchpadToken.creator = wallet`
+ *                        for at least one row (any token launched).
+ *   memeTokenGraduated — `true` if any of those tokens also has
+ *                        `graduated = true` (bonding curve completed →
+ *                        V2 pair created).
+ *
+ * Both bonuses are one-time per wallet regardless of how many tokens
+ * launched / graduated. Graduation pays out the harder-to-fake outcome —
+ * a wallet can spam-create cheap tokens, but only real demand fills a
+ * bonding curve.
+ *
+ * Single SQL query: we ask for the existence of (any row, any graduated
+ * row) for this wallet on this chain. Postgres returns both bools in one
+ * round-trip via `MAX(CASE...)`.
  */
 async function computeMemeTokenBonus(
   checksumAddress: string,
 ): Promise<PointsBreakdown["bonuses"]> {
-  const rows = await db
-    .select({ id: launchpadToken.id })
-    .from(launchpadToken)
-    .where(
-      and(
-        eq(launchpadToken.creator, checksumAddress),
-        eq(launchpadToken.chainId, JUICER_CAMPAIGN_CHAIN_ID),
-      ),
-    )
-    .limit(1);
+  const rawResult: any = await db.execute(sql`
+    SELECT
+      EXISTS (
+        SELECT 1 FROM ${launchpadToken}
+        WHERE ${launchpadToken.creator} = ${checksumAddress}
+          AND ${launchpadToken.chainId} = ${JUICER_CAMPAIGN_CHAIN_ID}
+      ) AS created,
+      EXISTS (
+        SELECT 1 FROM ${launchpadToken}
+        WHERE ${launchpadToken.creator} = ${checksumAddress}
+          AND ${launchpadToken.chainId} = ${JUICER_CAMPAIGN_CHAIN_ID}
+          AND ${launchpadToken.graduated} = TRUE
+      ) AS graduated
+  `);
+  // db.execute can return rows directly or wrapped in {rows: [...]}.
+  const row: { created?: boolean; graduated?: boolean } = Array.isArray(rawResult)
+    ? rawResult[0]
+    : (rawResult?.rows?.[0] ?? {});
 
-  const created = rows.length > 0;
+  const created = !!row.created;
+  const graduated = !!row.graduated;
   const memeTokenPoints = created ? POINTS_PER_MEME_TOKEN_CREATED : 0;
+  const memeTokenGraduatedPoints = graduated ? POINTS_PER_MEME_TOKEN_GRADUATED : 0;
   return {
     memeTokenCreated: created,
     memeTokenPoints,
-    points: memeTokenPoints,
+    memeTokenGraduated: graduated,
+    memeTokenGraduatedPoints,
+    points: memeTokenPoints + memeTokenGraduatedPoints,
   };
 }
 
@@ -393,6 +430,7 @@ export const POINTS_CONFIG = {
   POINTS_PER_SWAP,
   POINTS_PER_LIQUIDITY_DAY,
   POINTS_PER_MEME_TOKEN_CREATED,
+  POINTS_PER_MEME_TOKEN_GRADUATED,
   MIN_LIQUIDITY_USD,
   MAX_SWAP_POINTS_PER_DAY,
   FINALITY_OFFSET_BLOCKS,
