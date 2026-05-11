@@ -10,9 +10,9 @@
  *   - liquidity  — POINTS_PER_LIQUIDITY_DAY per UTC day a wallet held ≥ $10
  *                  of LP in whitelisted pools throughout the whole 24h window.
  *   - bonuses    — one-time stacking bonuses on Citrea Mainnet:
- *                    500 JP for creating at least one launchpad meme token
- *                    500 JP for that wallet's token graduating (bonding
- *                                 curve filled → V2 pair created)
+ *                       500 JP for creating at least one launchpad meme token
+ *                    10,000 JP for that wallet's token graduating (bonding
+ *                                  curve filled → V2 pair created)
  *                  Also drives the Juicer NFT "create meme token"
  *                  requirement (campaign backend reads
  *                  `bonuses.memeTokenCreated`).
@@ -51,7 +51,7 @@ import { blockProgress, launchpadToken, lpDayCredit, lpPositionWallet, transacti
 const POINTS_PER_SWAP = 100;
 const POINTS_PER_LIQUIDITY_DAY = 50;
 const POINTS_PER_MEME_TOKEN_CREATED = 500; // one-time bonus per wallet per chain
-const POINTS_PER_MEME_TOKEN_GRADUATED = 500; // one-time bonus per wallet per chain
+const POINTS_PER_MEME_TOKEN_GRADUATED = 10_000; // one-time bonus per wallet per chain
 const MIN_LIQUIDITY_USD = 10;
 const MIN_LIQUIDITY_USD_CENTS = 1_000; // = $10.00
 const MAX_SWAP_POINTS_PER_DAY = 1_000; // = 10 swaps per UTC day per address
