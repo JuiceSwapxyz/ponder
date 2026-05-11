@@ -6,3 +6,4 @@ import "./ponder/blockProgress";
 import "./ponder/governance";
 import "./ponder/feeCollector";
 import "./ponder/bridges";
+import "./ponder/lpPoints";

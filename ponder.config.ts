@@ -17,13 +17,30 @@ import { parseAbiItem } from "viem";
 
 const LAUNCHPAD_TESTNET_ADDRESSES = LAUNCHPAD_ADDRESSES[5115];
 const LAUNCHPAD_MAINNET_ADDRESSES = LAUNCHPAD_ADDRESSES[4114];
-const START_BLOCK_LAUNCHPAD_TESTNET = 21252514;
+
+// Launchpad factory deployment blocks (TokenFactory + BondingCurveToken).
+// Confirmed via eth_getCode binary search.
+const START_BLOCK_LAUNCHPAD_TESTNET = 21257408;
 const START_BLOCK_LAUNCHPAD_MAINNET = 2652915;
 
 const V3_TESTNET_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_TESTNET];
 const V3_MAINNET_ADDRESSES = CHAIN_TO_ADDRESSES_MAP[ChainId.CITREA_MAINNET];
-const START_BLOCK_TESTNET = 21252514;
-const START_BLOCK_MAINNET = 2651625;
+
+// V3 factory deployment blocks (used as the anchor for V3 Factory, Pool factory
+// pattern, Position Manager, SwapRouter, governance, fee collector, gateway).
+// Anything earlier than the factory cannot exist on-chain, so this is the
+// earliest correct value. Confirmed via eth_getCode binary search.
+//   Mainnet V3 factory @ 2,651,539 (was 2,651,625 — missed pool-creates in 2,651,539..2,651,624)
+//   Testnet V3 factory @ 21,255,175
+const START_BLOCK_TESTNET = 21255175;
+const START_BLOCK_MAINNET = 2651539;
+
+// V2 core factory deployment blocks (separate from launchpad TokenFactory).
+// Pre-launchpad V2 pools were missed when this shared LAUNCHPAD start blocks.
+//   Mainnet V2 factory @ 2,651,525 (was 2,652,915 — missed every pre-launchpad V2 pair)
+//   Testnet V2 factory @ 21,255,162
+const START_BLOCK_V2_TESTNET = 21255162;
+const START_BLOCK_V2_MAINNET = 2651525;
 
 export default createConfig({
   chains: {
@@ -139,7 +156,7 @@ export default createConfig({
       abi: UniswapV2PairAbi as any,
       chain: {
         citreaTestnet: {
-          startBlock: START_BLOCK_LAUNCHPAD_TESTNET,
+          startBlock: START_BLOCK_V2_TESTNET,
           address: factory({
             address: V2_FACTORY_ADDRESSES[ChainId.CITREA_TESTNET] as `0x${string}`,
             event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),
@@ -147,7 +164,7 @@ export default createConfig({
           })
         },
         citrea: {
-          startBlock: START_BLOCK_LAUNCHPAD_MAINNET,
+          startBlock: START_BLOCK_V2_MAINNET,
           address: factory({
             address: V2_FACTORY_ADDRESSES[ChainId.CITREA_MAINNET] as `0x${string}`,
             event: parseAbiItem('event PairCreated(address indexed token0, address indexed token1, address pair, uint256)'),

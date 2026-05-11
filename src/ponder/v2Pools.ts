@@ -4,12 +4,14 @@
  */
 // @ts-ignore
 import { getIdByTemporalFrame, TEMPORAL_FRAMES } from "@/utils/timestamps";
-import { v2PoolStat, graduatedV2Pool, launchpadToken } from "ponder.schema";
+import { graduatedV2Pool, launchpadToken, transactionSwap, v2PoolStat } from "ponder.schema";
 // @ts-ignore
 import { safeBigInt } from "@/utils/helpers";
 // @ts-ignore
 import { ponder } from "ponder:registry";
 import { getAddress } from "viem";
+// @ts-ignore
+import { isJuiceSwapRouter } from "@/utils/pointsWhitelist";
 
 const abs = (n: bigint) => (n < 0n ? -n : n);
 
@@ -71,6 +73,50 @@ ponder.on(
         amount1: volume1,
         chainId,
       });
+
+      // JUICE POINTS: write a transactionSwap row when (a) the tx originates
+      // from a JuiceSwap router/gateway and (b) the V2 pair belongs to a
+      // graduated launchpad token (so we know its token0/token1). Pre-launchpad
+      // V2 pairs that the launchpad never registered are skipped here — they
+      // have no `graduatedV2Pool` row and we cannot identify a swapper without
+      // ambiguity for V2 (sender == router in most flows). The `from` field on
+      // the TX is the user's EOA, which is what we want for point credit.
+      if (
+        event.transaction &&
+        isJuiceSwapRouter(chainId, event.transaction.to)
+      ) {
+        const graduated = await context.db.find(graduatedV2Pool, { id: poolAddress });
+        if (graduated) {
+          // Determine which side was taken IN (the trader sent it) vs OUT.
+          const tokenInIsToken0 = abs(event.args.amount0In) > 0n;
+          const amountIn = tokenInIsToken0
+            ? abs(event.args.amount0In)
+            : abs(event.args.amount1In);
+          const amountOut = tokenInIsToken0
+            ? abs(event.args.amount1Out)
+            : abs(event.args.amount0Out);
+          const tokenIn = tokenInIsToken0 ? graduated.token0 : graduated.token1;
+          const tokenOut = tokenInIsToken0 ? graduated.token1 : graduated.token0;
+
+          await context.db
+            .insert(transactionSwap)
+            .values({
+              id: event.id,
+              txHash: event.transaction.hash,
+              chainId,
+              blockNumber: event.block.number,
+              blockTimestamp: event.block.timestamp,
+              from: event.transaction.from,
+              to: event.transaction.to,
+              tokenIn: getAddress(tokenIn),
+              tokenOut: getAddress(tokenOut),
+              amountIn,
+              amountOut,
+              swapperAddress: getAddress(event.transaction.from),
+            })
+            .onConflictDoNothing();
+        }
+      }
 
       // Check if this pool is a graduated launchpad token
       const pool = await context.db.find(graduatedV2Pool, { id: poolAddress });

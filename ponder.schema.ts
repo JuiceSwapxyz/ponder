@@ -171,6 +171,57 @@ export const blockProgress = onchainTable("blockProgress", (t) => ({
   lastUpdatedAt: t.bigint().notNull(),
 }));
 
+// ============ JUICE POINTS — LP TRACKING ============
+
+/**
+ * Per-(chainId, wallet, tokenId) running USD-cent value of a single V3 NFT
+ * LP position. Updated on every IncreaseLiquidity / DecreaseLiquidity. Used by
+ * `lpPositionWallet` to aggregate per wallet.
+ *
+ * `usdCents` is the principal-anchored valuation defined in `lpValuation.ts`;
+ * it is NOT mark-to-market and intentionally never goes negative (clamped at 0).
+ */
+export const lpPosition = onchainTable("lp_position", (t) => ({
+  id: t.text().primaryKey(),         // {chainId}:{tokenId}
+  chainId: t.integer().notNull(),
+  tokenId: t.text().notNull(),
+  owner: t.text().notNull(),         // checksum-case wallet that holds the NFT
+  poolAddress: t.text().notNull(),
+  usdCents: t.bigint().notNull(),
+}));
+
+/**
+ * Per-(chainId, wallet) aggregate LP USD value across all whitelisted positions.
+ * Maintained as a running sum so `points.ts` does one row lookup per address.
+ *
+ * `lastEventTimestamp` is the on-chain timestamp of the most recent LP event
+ * for this wallet — used at READ time in `points.ts` to credit completed UTC
+ * days that have elapsed since with no LP event (carry-forward logic).
+ */
+export const lpPositionWallet = onchainTable("lp_position_wallet", (t) => ({
+  id: t.text().primaryKey(),         // {chainId}:{walletLower}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(), // checksum form (matches transactionSwap)
+  usdCents: t.bigint().notNull(),
+  lastEventTimestamp: t.bigint().notNull(),
+}));
+
+/**
+ * Existence = "wallet held ≥ MIN_LIQUIDITY_USD_CENTS of LP throughout this
+ * complete UTC day". One row per credited day per wallet. The LP handler
+ * inserts a row for every fully-covered day between two consecutive LP events.
+ *
+ * COUNT(*) per wallet gives the historical credited-days total. The live tail
+ * (days since `lastEventTimestamp` where the running value is still ≥ $10) is
+ * computed at read time and added on top.
+ */
+export const lpDayCredit = onchainTable("lp_day_credit", (t) => ({
+  id: t.text().primaryKey(),         // {chainId}:{walletLower}:{day}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),
+  day: t.bigint().notNull(),         // floor(timestamp / 86400)
+}));
+
 // ============ LAUNCHPAD SCHEMA ============
 
 export const launchpadToken = onchainTable("launchpadToken", (t) => ({

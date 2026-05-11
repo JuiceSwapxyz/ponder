@@ -16,6 +16,8 @@ import { ponder } from "ponder:registry";
 import { getAddress } from "viem";
 import { CAMPAIGN_POOLS, safeBigInt } from "@/utils/campaign";
 import { safeGetAddress } from "@/utils/helpers";
+// @ts-ignore
+import { isJuiceSwapRouter } from "@/utils/pointsWhitelist";
 
 const abs = (n: bigint) => n < 0n ? -n : n;
 
@@ -140,20 +142,26 @@ ponder.on(
         const amountOut =
           event.args.amount0 > 0n ? abs(event.args.amount1) : abs(event.args.amount0);
 
-        await context.db.insert(transactionSwap).values({
-          id: event.id,
-          txHash: event.transaction.hash,
-          chainId,
-          blockNumber: event.block.number,
-          blockTimestamp: event.block.timestamp,
-          from: event.transaction.from,
-          to: event.transaction.to,
-          tokenIn: getAddress(tokenIn),
-          tokenOut: getAddress(tokenOut),
-          amountIn: amountIn,
-          amountOut: amountOut,
-          swapperAddress: getAddress(event.transaction.from),
-        }).onConflictDoNothing();
+        // ANTI-EXPLOIT: only count swaps where the user's EOA called a
+        // JuiceSwap router/gateway. Direct-pool arb, foreign aggregators
+        // (1inch, OpenOcean, etc.) and bot contracts emit the same Swap
+        // event but with a different `transaction.to` and must not earn JP.
+        if (isJuiceSwapRouter(chainId, event.transaction.to)) {
+          await context.db.insert(transactionSwap).values({
+            id: event.id,
+            txHash: event.transaction.hash,
+            chainId,
+            blockNumber: event.block.number,
+            blockTimestamp: event.block.timestamp,
+            from: event.transaction.from,
+            to: event.transaction.to,
+            tokenIn: getAddress(tokenIn),
+            tokenOut: getAddress(tokenOut),
+            amountIn: amountIn,
+            amountOut: amountOut,
+            swapperAddress: getAddress(event.transaction.from),
+          }).onConflictDoNothing();
+        }
 
         await updateTokenStat({
           context,
