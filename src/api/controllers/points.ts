@@ -2,7 +2,17 @@
  * Points API controller - endpoints powering the JuiceSwap "Juice Points" UI.
  *
  *   GET /points/:address          -> PointsBreakdown for this wallet
- *   GET /points/leaderboard       -> Top N wallets ranked by total points
+ *   GET /points/leaderboard       -> Top N wallets ranked by swap points
+ *
+ * Points categories surfaced in PointsBreakdown:
+ *   - swaps      — POINTS_PER_SWAP per JuiceSwap-router-originated swap,
+ *                  daily-capped at MAX_SWAP_POINTS_PER_DAY per address.
+ *   - liquidity  — POINTS_PER_LIQUIDITY_DAY per UTC day a wallet held ≥ $10
+ *                  of LP in whitelisted pools throughout the whole 24h window.
+ *   - bonuses    — one-time bonuses. Currently: 500 JP for creating at least
+ *                  one launchpad meme token on Citrea Mainnet. Also drives
+ *                  the Juicer NFT "create meme token" requirement (campaign
+ *                  backend reads `bonuses.memeTokenCreated`).
  *
  * Anti-exploit guarantees (server-side, browser cannot influence):
  *   - Swap counts come from `transactionSwap`, which the indexer only writes
@@ -33,15 +43,22 @@ import NodeCache from "node-cache";
 // @ts-ignore
 import { db } from "ponder:api";
 // @ts-ignore
-import { blockProgress, lpDayCredit, lpPositionWallet, transactionSwap } from "ponder:schema";
+import { blockProgress, launchpadToken, lpDayCredit, lpPositionWallet, transactionSwap } from "ponder:schema";
 
 const POINTS_PER_SWAP = 100;
 const POINTS_PER_LIQUIDITY_DAY = 50;
+const POINTS_PER_MEME_TOKEN_CREATED = 500; // one-time bonus per wallet per chain
 const MIN_LIQUIDITY_USD = 10;
 const MIN_LIQUIDITY_USD_CENTS = 1_000; // = $10.00
 const MAX_SWAP_POINTS_PER_DAY = 1_000; // = 10 swaps per UTC day per address
 const FINALITY_OFFSET_BLOCKS = 32;
 const LEADERBOARD_LIMIT = 100;
+
+// Chain that the Juicer NFT campaign treats as canonical for the
+// "create meme token" requirement. Token launches on other chains do NOT
+// satisfy the campaign condition (but they still earn the 500 JP bonus on
+// that chain via the per-chain check below).
+const JUICER_CAMPAIGN_CHAIN_ID = 4114; // Citrea Mainnet
 
 const POINTS_CACHE_TTL_S = 30;
 const LEADERBOARD_CACHE_TTL_S = 30;
@@ -67,6 +84,22 @@ interface PointsBreakdown {
     points: number;
     currentUsdValue: number;
     meetsMinimum: boolean;
+  };
+  bonuses: {
+    /**
+     * `true` once the wallet has created at least one launchpad token on the
+     * Juicer campaign chain (Citrea Mainnet). Drives the "create meme token"
+     * condition in the Juicer NFT campaign — the campaign backend reads this
+     * flag instead of duplicating the chain lookup.
+     */
+    memeTokenCreated: boolean;
+    /**
+     * One-time JP awarded for creating a meme token. Counted once per wallet
+     * regardless of how many tokens that wallet has launched.
+     */
+    memeTokenPoints: number;
+    /** Sum of all bonus categories — for now == memeTokenPoints. */
+    points: number;
   };
 }
 
@@ -206,18 +239,48 @@ async function computeLpPoints(
   };
 }
 
+/**
+ * Has the wallet created at least one launchpad token on Citrea Mainnet?
+ * One row from `launchpadToken` is enough — the bonus is one-time per wallet
+ * regardless of how many tokens were launched.
+ */
+async function computeMemeTokenBonus(
+  checksumAddress: string,
+): Promise<PointsBreakdown["bonuses"]> {
+  const rows = await db
+    .select({ id: launchpadToken.id })
+    .from(launchpadToken)
+    .where(
+      and(
+        eq(launchpadToken.creator, checksumAddress),
+        eq(launchpadToken.chainId, JUICER_CAMPAIGN_CHAIN_ID),
+      ),
+    )
+    .limit(1);
+
+  const created = rows.length > 0;
+  const memeTokenPoints = created ? POINTS_PER_MEME_TOKEN_CREATED : 0;
+  return {
+    memeTokenCreated: created,
+    memeTokenPoints,
+    points: memeTokenPoints,
+  };
+}
+
 async function buildBreakdown(
   checksumAddress: string,
   finalityCutoff: bigint,
 ): Promise<PointsBreakdown> {
-  const [swaps, liquidity] = await Promise.all([
+  const [swaps, liquidity, bonuses] = await Promise.all([
     computeSwapPoints(checksumAddress, finalityCutoff),
     computeLpPoints(checksumAddress),
+    computeMemeTokenBonus(checksumAddress),
   ]);
   return {
-    total: swaps.points + liquidity.points,
+    total: swaps.points + liquidity.points + bonuses.points,
     swaps,
     liquidity,
+    bonuses,
   };
 }
 
@@ -329,8 +392,10 @@ export default points;
 export const POINTS_CONFIG = {
   POINTS_PER_SWAP,
   POINTS_PER_LIQUIDITY_DAY,
+  POINTS_PER_MEME_TOKEN_CREATED,
   MIN_LIQUIDITY_USD,
   MAX_SWAP_POINTS_PER_DAY,
   FINALITY_OFFSET_BLOCKS,
   LEADERBOARD_LIMIT,
+  JUICER_CAMPAIGN_CHAIN_ID,
 };
