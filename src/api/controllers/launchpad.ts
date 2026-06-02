@@ -28,7 +28,10 @@ launchpad.get("/tokens", async (c: Context) => {
   try {
     const filter = c.req.query("filter") || "all";
     const page = Math.max(0, parseInt(c.req.query("page") || "0"));
-    const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") || "20")));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(c.req.query("limit") || "20")),
+    );
     const sort = c.req.query("sort") || "newest";
     const chainIdParam = c.req.query("chainId");
     const chainId = chainIdParam ? parseInt(chainIdParam) : undefined;
@@ -54,8 +57,8 @@ launchpad.get("/tokens", async (c: Context) => {
         conditions.push(
           or(
             gte(launchpadToken.progress, GRADUATING_THRESHOLD),
-            eq(launchpadToken.canGraduate, true)
-          )
+            eq(launchpadToken.canGraduate, true),
+          ),
         );
         break;
       case "graduated":
@@ -74,7 +77,9 @@ launchpad.get("/tokens", async (c: Context) => {
         orderBy = desc(launchpadToken.totalVolumeBase);
         break;
       case "trades":
-        orderBy = desc(sql`${launchpadToken.totalBuys} + ${launchpadToken.totalSells}`);
+        orderBy = desc(
+          sql`${launchpadToken.totalBuys} + ${launchpadToken.totalSells}`,
+        );
         break;
       default: // "newest"
         orderBy = desc(launchpadToken.createdAt);
@@ -97,15 +102,20 @@ launchpad.get("/tokens", async (c: Context) => {
 
     const total = totalResult[0]?.count || 0;
 
-    return c.json(replaceBigInts({
-      tokens,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }, (v) => String(v)));
+    return c.json(
+      replaceBigInts(
+        {
+          tokens,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        (v) => String(v),
+      ),
+    );
   } catch (error) {
     console.error("[Launchpad API] Error fetching tokens:", error);
     return c.json({ error: "Failed to fetch tokens" }, 500);
@@ -150,7 +160,10 @@ launchpad.get("/token/:address", async (c: Context) => {
 launchpad.get("/token/:address/trades", async (c: Context) => {
   try {
     const address = c.req.param("address");
-    const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") || "50")));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(c.req.query("limit") || "50")),
+    );
     const page = Math.max(0, parseInt(c.req.query("page") || "0"));
     const offset = page * limit;
 
@@ -175,15 +188,20 @@ launchpad.get("/token/:address/trades", async (c: Context) => {
 
     const total = totalResult[0]?.count || 0;
 
-    return c.json(replaceBigInts({
-      trades,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }, (v) => String(v)));
+    return c.json(
+      replaceBigInts(
+        {
+          trades,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        (v) => String(v),
+      ),
+    );
   } catch (error) {
     console.error("[Launchpad API] Error fetching trades:", error);
     return c.json({ error: "Failed to fetch trades" }, 500);
@@ -201,12 +219,14 @@ launchpad.get("/stats", async (c: Context) => {
     const chainId = chainIdParam ? parseInt(chainIdParam) : undefined;
 
     // Build base chain filter condition
-    const chainFilter = chainId !== undefined && !isNaN(chainId)
-      ? eq(launchpadToken.chainId, chainId)
-      : undefined;
-    const tradeChainFilter = chainId !== undefined && !isNaN(chainId)
-      ? eq(launchpadTrade.chainId, chainId)
-      : undefined;
+    const chainFilter =
+      chainId !== undefined && !isNaN(chainId)
+        ? eq(launchpadToken.chainId, chainId)
+        : undefined;
+    const tradeChainFilter =
+      chainId !== undefined && !isNaN(chainId)
+        ? eq(launchpadTrade.chainId, chainId)
+        : undefined;
 
     const totalTokensResult = await db
       .select({ count: count() })
@@ -216,15 +236,14 @@ launchpad.get("/stats", async (c: Context) => {
     const graduatedTokensResult = await db
       .select({ count: count() })
       .from(launchpadToken)
-      .where(chainFilter
-        ? and(chainFilter, eq(launchpadToken.graduated, true))
-        : eq(launchpadToken.graduated, true)
+      .where(
+        chainFilter
+          ? and(chainFilter, eq(launchpadToken.graduated, true))
+          : eq(launchpadToken.graduated, true),
       );
 
     // Active = all non-graduated tokens (includes both regular active and graduating)
-    const activeConditions = [
-      eq(launchpadToken.graduated, false),
-    ];
+    const activeConditions = [eq(launchpadToken.graduated, false)];
     if (chainFilter) activeConditions.unshift(chainFilter);
     const activeTokensResult = await db
       .select({ count: count() })
@@ -236,7 +255,7 @@ launchpad.get("/stats", async (c: Context) => {
       eq(launchpadToken.graduated, false),
       or(
         gte(launchpadToken.progress, GRADUATING_THRESHOLD),
-        eq(launchpadToken.canGraduate, true)
+        eq(launchpadToken.canGraduate, true),
       ),
     ];
     if (chainFilter) graduatingConditions.unshift(chainFilter);
@@ -251,7 +270,9 @@ launchpad.get("/stats", async (c: Context) => {
       .where(tradeChainFilter);
 
     const totalVolumeResult = await db
-      .select({ volume: sql<string>`COALESCE(SUM(${launchpadToken.totalVolumeBase}), 0)::text` })
+      .select({
+        volume: sql<string>`COALESCE(SUM(${launchpadToken.totalVolumeBase}), 0)::text`,
+      })
       .from(launchpadToken)
       .where(chainFilter);
 
@@ -277,14 +298,18 @@ launchpad.get("/stats", async (c: Context) => {
  */
 launchpad.get("/recent-trades", async (c: Context) => {
   try {
-    const limit = Math.min(50, Math.max(1, parseInt(c.req.query("limit") || "20")));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(c.req.query("limit") || "20")),
+    );
     const chainIdParam = c.req.query("chainId");
     const chainId = chainIdParam ? parseInt(chainIdParam) : undefined;
 
     // Build chain filter condition
-    const chainFilter = chainId !== undefined && !isNaN(chainId)
-      ? eq(launchpadTrade.chainId, chainId)
-      : undefined;
+    const chainFilter =
+      chainId !== undefined && !isNaN(chainId)
+        ? eq(launchpadTrade.chainId, chainId)
+        : undefined;
 
     const trades = await db
       .select({
@@ -292,6 +317,7 @@ launchpad.get("/recent-trades", async (c: Context) => {
         tokenAddress: launchpadTrade.tokenAddress,
         trader: launchpadTrade.trader,
         isBuy: launchpadTrade.isBuy,
+        isDevBuy: launchpadTrade.isDevBuy,
         baseAmount: launchpadTrade.baseAmount,
         tokenAmount: launchpadTrade.tokenAmount,
         timestamp: launchpadTrade.timestamp,
@@ -300,7 +326,10 @@ launchpad.get("/recent-trades", async (c: Context) => {
         tokenSymbol: launchpadToken.symbol,
       })
       .from(launchpadTrade)
-      .leftJoin(launchpadToken, eq(launchpadTrade.tokenAddress, launchpadToken.address))
+      .leftJoin(
+        launchpadToken,
+        eq(launchpadTrade.tokenAddress, launchpadToken.address),
+      )
       .where(chainFilter)
       .orderBy(desc(launchpadTrade.timestamp))
       .limit(limit);
