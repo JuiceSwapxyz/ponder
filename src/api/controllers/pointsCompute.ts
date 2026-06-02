@@ -116,7 +116,13 @@ export async function latestFinalizedBlock(db: PointsDb): Promise<bigint> {
 
 /**
  * Per-address swap-points aggregation: GROUP BY UTC day, then apply the daily
- * cap in JS.
+ * cap in JS. The dataset is one wallet's day-buckets, so the row count is
+ * bounded by the number of distinct days that wallet was active.
+ *
+ * Performance: address comparison uses the checksum form (no LOWER(...) wrap)
+ * so an index on (swapperAddress, blockNumber) is actually used. Recommended:
+ *   CREATE INDEX IF NOT EXISTS transaction_swap_swapper_block
+ *     ON "transactionSwap" ("swapperAddress", "blockNumber");
  */
 export async function computeSwapPoints(
   db: PointsDb,
