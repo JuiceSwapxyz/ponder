@@ -9,6 +9,9 @@ export default defineConfig({
       "ponder:api": fileURLToPath(
         new URL("./test/points/ponderApiStub.ts", import.meta.url),
       ),
+      // Mirror tsconfig `@/* -> ./src/*` so source modules that import via the
+      // `@` alias resolve under Vitest without per-test module shims.
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   test: {
