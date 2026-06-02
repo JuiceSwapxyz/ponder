@@ -48,7 +48,10 @@ activity.get("/swaps", async (c: Context) => {
   try {
     const addressParam = c.req.query("address");
     const chainIdParam = c.req.query("chainId");
-    const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") || "50") || 50));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(c.req.query("limit") || "50") || 50),
+    );
     const offset = Math.max(0, parseInt(c.req.query("offset") || "0") || 0);
 
     if (!addressParam || !isAddress(addressParam)) {
@@ -59,7 +62,9 @@ activity.get("/swaps", async (c: Context) => {
     const chainId = chainIdParam ? parseInt(chainIdParam) : undefined;
 
     // Build conditions for transactionSwap query
-    const swapConditions = [eq(transactionSwap.swapperAddress, checksumAddress)];
+    const swapConditions = [
+      eq(transactionSwap.swapperAddress, checksumAddress),
+    ];
     if (chainId !== undefined && !isNaN(chainId)) {
       swapConditions.push(eq(transactionSwap.chainId, chainId));
     }
@@ -89,10 +94,13 @@ activity.get("/swaps", async (c: Context) => {
         tokenInName: token.name,
       })
       .from(transactionSwap)
-      .leftJoin(token, and(
-        sql`LOWER(${transactionSwap.tokenIn}) = LOWER(${token.address})`,
-        eq(transactionSwap.chainId, token.chainId)
-      ))
+      .leftJoin(
+        token,
+        and(
+          sql`LOWER(${transactionSwap.tokenIn}) = LOWER(${token.address})`,
+          eq(transactionSwap.chainId, token.chainId),
+        ),
+      )
       .where(and(...swapConditions))
       .orderBy(desc(transactionSwap.blockTimestamp))
       .limit(limit)
@@ -109,6 +117,7 @@ activity.get("/swaps", async (c: Context) => {
         trader: launchpadTrade.trader,
         tokenAddress: launchpadTrade.tokenAddress,
         isBuy: launchpadTrade.isBuy,
+        isDevBuy: launchpadTrade.isDevBuy,
         baseAmount: launchpadTrade.baseAmount,
         tokenAmount: launchpadTrade.tokenAmount,
         // Token metadata from joined table
@@ -116,21 +125,29 @@ activity.get("/swaps", async (c: Context) => {
         tokenName: launchpadToken.name,
       })
       .from(launchpadTrade)
-      .leftJoin(launchpadToken, and(
-        sql`LOWER(${launchpadTrade.tokenAddress}) = LOWER(${launchpadToken.address})`,
-        eq(launchpadTrade.chainId, launchpadToken.chainId)
-      ))
+      .leftJoin(
+        launchpadToken,
+        and(
+          sql`LOWER(${launchpadTrade.tokenAddress}) = LOWER(${launchpadToken.address})`,
+          eq(launchpadTrade.chainId, launchpadToken.chainId),
+        ),
+      )
       .where(and(...tradeConditions))
       .orderBy(desc(launchpadTrade.timestamp))
       .limit(limit)
       .offset(offset);
 
     // Execute both queries in parallel
-    const [swaps, trades] = await Promise.all([swapsPromise, tradesPromise]) as [SwapResult[], unknown[]];
+    const [swaps, trades] = (await Promise.all([
+      swapsPromise,
+      tradesPromise,
+    ])) as [SwapResult[], unknown[]];
 
     // Batch fetch tokenOut metadata (avoid N+1 queries)
     // Normalize addresses to lowercase for case-insensitive matching
-    const uniqueAddressesLower = [...new Set(swaps.map((s: SwapResult) => s.tokenOut.toLowerCase()))];
+    const uniqueAddressesLower = [
+      ...new Set(swaps.map((s: SwapResult) => s.tokenOut.toLowerCase())),
+    ];
 
     const outTokens: TokenMetadata[] =
       uniqueAddressesLower.length > 0
@@ -143,17 +160,27 @@ activity.get("/swaps", async (c: Context) => {
               name: token.name,
             })
             .from(token)
-            .where(sql`LOWER(${token.address}) IN (${sql.join(uniqueAddressesLower.map(a => sql`${a}`), sql`, `)})`)
+            .where(
+              sql`LOWER(${token.address}) IN (${sql.join(
+                uniqueAddressesLower.map((a) => sql`${a}`),
+                sql`, `,
+              )})`,
+            )
         : [];
 
     // Create lookup map keyed by "lowercase_address:chainId" for case-insensitive lookup
     const outTokenMap = new Map<string, TokenMetadata>(
-      outTokens.map((t: TokenMetadata) => [`${t.address.toLowerCase()}:${t.chainId}`, t])
+      outTokens.map((t: TokenMetadata) => [
+        `${t.address.toLowerCase()}:${t.chainId}`,
+        t,
+      ]),
     );
 
     // Enrich swaps with tokenOut metadata
     const swapsWithOutMetadata = swaps.map((swap: SwapResult) => {
-      const outToken = outTokenMap.get(`${swap.tokenOut.toLowerCase()}:${swap.chainId}`);
+      const outToken = outTokenMap.get(
+        `${swap.tokenOut.toLowerCase()}:${swap.chainId}`,
+      );
       return {
         ...swap,
         tokenOutSymbol: outToken?.symbol || null,
@@ -173,7 +200,10 @@ activity.get("/swaps", async (c: Context) => {
       .from(launchpadTrade)
       .where(and(...tradeConditions));
 
-    const [swapCount, tradeCount] = await Promise.all([swapCountPromise, tradeCountPromise]);
+    const [swapCount, tradeCount] = await Promise.all([
+      swapCountPromise,
+      tradeCountPromise,
+    ]);
 
     return c.json(
       replaceBigInts(
@@ -187,8 +217,8 @@ activity.get("/swaps", async (c: Context) => {
             tradeCount: tradeCount[0]?.count || 0,
           },
         },
-        (v) => String(v)
-      )
+        (v) => String(v),
+      ),
     );
   } catch (error) {
     console.error("[Activity API] Error fetching swaps:", error);

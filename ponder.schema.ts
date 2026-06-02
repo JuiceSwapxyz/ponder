@@ -176,6 +176,7 @@ export const blockProgress = onchainTable("blockProgress", (t) => ({
 export const launchpadToken = onchainTable("launchpadToken", (t) => ({
   id: t.text().primaryKey(), // token address
   address: t.hex().notNull(),
+  factory: t.hex().notNull(),
   chainId: t.integer().notNull(),
   name: t.text().notNull(),
   symbol: t.text().notNull(),
@@ -199,6 +200,13 @@ export const launchpadToken = onchainTable("launchpadToken", (t) => ({
   lastTradeAt: t.bigint(),
   // Progress in basis points (0-10000) for bonding curve completion
   progress: t.integer().notNull().default(0),
+
+  // Optional creator dev buy executed atomically during token creation
+  devBuyEnabled: t.boolean().notNull().default(false),
+  devBuyBaseAmount: t.bigint(),
+  devBuyTokenAmount: t.bigint(),
+  devBuyTxHash: t.hex(),
+  devBuyAtBlock: t.bigint(),
 }));
 
 export const launchpadTrade = onchainTable("launchpadTrade", (t) => ({
@@ -207,6 +215,7 @@ export const launchpadTrade = onchainTable("launchpadTrade", (t) => ({
   chainId: t.integer().notNull(),
   trader: t.hex().notNull(),
   isBuy: t.boolean().notNull(),
+  isDevBuy: t.boolean().notNull().default(false),
   baseAmount: t.bigint().notNull(),
   tokenAmount: t.bigint().notNull(),
   timestamp: t.bigint().notNull(),
@@ -242,15 +251,15 @@ export const graduatedV2Pool = onchainTable("graduatedV2Pool", (t) => ({
 // ============ GOVERNANCE & SECURITY MONITORING ============
 
 export const governorProposal = onchainTable("governorProposal", (t) => ({
-  id: t.text().primaryKey(),         // {chainId}:{proposalId}
+  id: t.text().primaryKey(), // {chainId}:{proposalId}
   chainId: t.integer().notNull(),
   proposalId: t.bigint().notNull(),
   proposer: t.hex().notNull(),
   target: t.hex().notNull(),
-  calldata: t.text().notNull(),      // hex-encoded
+  calldata: t.text().notNull(), // hex-encoded
   executeAfter: t.bigint().notNull(),
   description: t.text().notNull(),
-  status: t.text().notNull(),        // "active" | "executed" | "vetoed"
+  status: t.text().notNull(), // "active" | "executed" | "vetoed"
   executedBy: t.hex(),
   vetoedBy: t.hex(),
   createdAtBlock: t.bigint().notNull(),
@@ -260,44 +269,56 @@ export const governorProposal = onchainTable("governorProposal", (t) => ({
   resolvedTxHash: t.hex(),
 }));
 
-export const feeCollectorOwnerUpdate = onchainTable("feeCollectorOwnerUpdate", (t) => ({
-  id: t.text().primaryKey(),         // {chainId}:{txHash}:{logIndex}
-  chainId: t.integer().notNull(),
-  newOwner: t.hex().notNull(),
-  blockNumber: t.bigint().notNull(),
-  blockTimestamp: t.bigint().notNull(),
-  txHash: t.hex().notNull(),
-}));
+export const feeCollectorOwnerUpdate = onchainTable(
+  "feeCollectorOwnerUpdate",
+  (t) => ({
+    id: t.text().primaryKey(), // {chainId}:{txHash}:{logIndex}
+    chainId: t.integer().notNull(),
+    newOwner: t.hex().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    txHash: t.hex().notNull(),
+  }),
+);
 
-export const feeCollectorRouterUpdate = onchainTable("feeCollectorRouterUpdate", (t) => ({
-  id: t.text().primaryKey(),
-  chainId: t.integer().notNull(),
-  oldRouter: t.hex().notNull(),
-  newRouter: t.hex().notNull(),
-  blockNumber: t.bigint().notNull(),
-  blockTimestamp: t.bigint().notNull(),
-  txHash: t.hex().notNull(),
-}));
+export const feeCollectorRouterUpdate = onchainTable(
+  "feeCollectorRouterUpdate",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    oldRouter: t.hex().notNull(),
+    newRouter: t.hex().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    txHash: t.hex().notNull(),
+  }),
+);
 
-export const feeCollectorCollectorUpdate = onchainTable("feeCollectorCollectorUpdate", (t) => ({
-  id: t.text().primaryKey(),
-  chainId: t.integer().notNull(),
-  oldCollector: t.hex().notNull(),
-  newCollector: t.hex().notNull(),
-  blockNumber: t.bigint().notNull(),
-  blockTimestamp: t.bigint().notNull(),
-  txHash: t.hex().notNull(),
-}));
+export const feeCollectorCollectorUpdate = onchainTable(
+  "feeCollectorCollectorUpdate",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    oldCollector: t.hex().notNull(),
+    newCollector: t.hex().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    txHash: t.hex().notNull(),
+  }),
+);
 
-export const feeCollectorProtectionUpdate = onchainTable("feeCollectorProtectionUpdate", (t) => ({
-  id: t.text().primaryKey(),
-  chainId: t.integer().notNull(),
-  twapPeriod: t.integer().notNull(),
-  maxSlippageBps: t.bigint().notNull(),
-  blockNumber: t.bigint().notNull(),
-  blockTimestamp: t.bigint().notNull(),
-  txHash: t.hex().notNull(),
-}));
+export const feeCollectorProtectionUpdate = onchainTable(
+  "feeCollectorProtectionUpdate",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    twapPeriod: t.integer().notNull(),
+    maxSlippageBps: t.bigint().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    txHash: t.hex().notNull(),
+  }),
+);
 
 export const factoryOwnerChange = onchainTable("factoryOwnerChange", (t) => ({
   id: t.text().primaryKey(),
@@ -309,28 +330,31 @@ export const factoryOwnerChange = onchainTable("factoryOwnerChange", (t) => ({
   txHash: t.hex().notNull(),
 }));
 
-export const gatewayBridgedTokenRegistration = onchainTable("gatewayBridgedTokenRegistration", (t) => ({
-  id: t.text().primaryKey(),
-  chainId: t.integer().notNull(),
-  token: t.hex().notNull(),
-  bridge: t.hex().notNull(),
-  registeredBy: t.hex().notNull(),
-  decimals: t.integer().notNull(),
-  blockNumber: t.bigint().notNull(),
-  blockTimestamp: t.bigint().notNull(),
-  txHash: t.hex().notNull(),
-}));
+export const gatewayBridgedTokenRegistration = onchainTable(
+  "gatewayBridgedTokenRegistration",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    token: t.hex().notNull(),
+    bridge: t.hex().notNull(),
+    registeredBy: t.hex().notNull(),
+    decimals: t.integer().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    txHash: t.hex().notNull(),
+  }),
+);
 
 export const oftBridgeEvent = onchainTable("oftBridgeEvent", (t) => ({
   id: t.text().primaryKey(),
   chainId: t.integer().notNull(),
-  direction: t.text().notNull(),     // "sent" | "received"
+  direction: t.text().notNull(), // "sent" | "received"
   guid: t.hex().notNull(),
-  remoteEid: t.integer().notNull(),  // dstEid (sent) or srcEid (received)
-  userAddress: t.hex().notNull(),    // sender (sent) or receiver (received)
-  amountSentLD: t.bigint(),          // only for "sent"
+  remoteEid: t.integer().notNull(), // dstEid (sent) or srcEid (received)
+  userAddress: t.hex().notNull(), // sender (sent) or receiver (received)
+  amountSentLD: t.bigint(), // only for "sent"
   amountReceivedLD: t.bigint().notNull(),
-  tokenAddress: t.hex().notNull(),   // which OFT contract emitted this
+  tokenAddress: t.hex().notNull(), // which OFT contract emitted this
   blockNumber: t.bigint().notNull(),
   blockTimestamp: t.bigint().notNull(),
   txHash: t.hex().notNull(),
