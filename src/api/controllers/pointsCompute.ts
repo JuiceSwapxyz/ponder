@@ -125,6 +125,11 @@ export async function computeSwapPoints(
 ): Promise<{ count: number; points: number }> {
   const dayExpr = sql<string>`floor(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})`;
 
+  // GROUP BY the SELECT ordinal (the day bucket is the first projected column)
+  // rather than re-rendering `dayExpr`: Drizzle emits the column unqualified in
+  // the projection but qualified in GROUP BY, and re-binds the divisor literal,
+  // so the two expressions are not byte-identical and Postgres rejects the query
+  // (SQLSTATE 42803). Ordinal grouping references the projection verbatim.
   const rows = await db
     .select({
       day: dayExpr,
@@ -137,7 +142,7 @@ export async function computeSwapPoints(
         lte(transactionSwap.blockNumber, finalityCutoff),
       ),
     )
-    .groupBy(dayExpr);
+    .groupBy(sql`1`);
 
   let totalCount = 0;
   let totalPoints = 0;
@@ -419,8 +424,11 @@ export async function computeLeaderboard(
         COUNT(*)::int AS n
       FROM ${transactionSwap}
       WHERE ${transactionSwap.blockNumber} <= ${finalityCutoff}
-      GROUP BY ${transactionSwap.swapperAddress},
-               FLOOR(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY})
+      -- Group by the SELECT ordinals (addr, day): re-interpolating the column
+      -- and divisor would re-bind the literal to a fresh placeholder, so the
+      -- GROUP BY expression would not match the projection and Postgres would
+      -- reject the query (SQLSTATE 42803).
+      GROUP BY 1, 2
     )
     SELECT
       addr,

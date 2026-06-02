@@ -1,6 +1,16 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // Stand in for the Ponder runtime virtual module so the real controller
+      // can be imported and driven over HTTP in the harness.
+      "ponder:api": fileURLToPath(
+        new URL("./test/points/ponderApiStub.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     include: ["test/**/*.test.ts"],
     // The points harness talks to a real Postgres; keep files serial so the
