@@ -7,12 +7,7 @@ import { getAddress, isAddress } from "viem";
 // @ts-ignore
 import { db } from "ponder:api";
 // @ts-ignore
-import {
-  transactionSwap,
-  launchpadTrade,
-  token,
-  launchpadToken,
-} from "ponder:schema";
+import { transactionSwap, launchpadTrade, token, launchpadToken } from "ponder:schema";
 
 const activity = new Hono();
 
