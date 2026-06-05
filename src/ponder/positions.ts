@@ -6,6 +6,8 @@ import { ponder } from "ponder:registry";
 // @ts-ignore
 import { decodeEventLog, erc20Abi, getAddress, zeroAddress } from "viem";
 import { safeGetAddress, safeBigInt } from "../utils/helpers";
+// @ts-ignore
+import { handleLpTransfer } from "./lpPoints";
 
 const getTokenOnchainData = async (address: string, context: any) => {
   const name = await context.client.readContract({
@@ -102,7 +104,11 @@ ponder.on(
   "NonfungiblePositionManager:Transfer", // Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
   async ({ event, context }: { event: any; context: any }) => {
     const chainId = context.chain.id;
-    
+
+    // JUICE POINTS — move the LP USD value between wallets (no-op for mints
+    // since IncreaseLiquidity in the same tx wires the initial value).
+    await handleLpTransfer(event, context);
+
     // NFT ownership
     try {
       const tokenId = event?.args?.tokenId;

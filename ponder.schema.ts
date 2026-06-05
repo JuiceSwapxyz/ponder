@@ -171,6 +171,143 @@ export const blockProgress = onchainTable("blockProgress", (t) => ({
   lastUpdatedAt: t.bigint().notNull(),
 }));
 
+// ============ JUICE POINTS — LP TRACKING ============
+
+/**
+ * Per-(chainId, wallet, tokenId) running USD-cent value of a single V3 NFT
+ * LP position. Updated on every IncreaseLiquidity / DecreaseLiquidity. Used by
+ * `lpPositionWallet` to aggregate per wallet.
+ *
+ * `usdCents` is the principal-anchored valuation defined in `lpValuation.ts`;
+ * it is NOT mark-to-market and intentionally never goes negative (clamped at 0).
+ */
+export const lpPosition = onchainTable("lp_position", (t) => ({
+  id: t.text().primaryKey(),         // {chainId}:{tokenId}
+  chainId: t.integer().notNull(),
+  tokenId: t.text().notNull(),
+  owner: t.text().notNull(),         // checksum-case wallet that holds the NFT
+  poolAddress: t.text().notNull(),
+  usdCents: t.bigint().notNull(),
+}));
+
+/**
+ * Per-(chainId, wallet) aggregate LP USD value across all whitelisted positions.
+ * Maintained as a running sum so `points.ts` does one row lookup per address.
+ *
+ * `lastEventTimestamp` is the on-chain timestamp of the most recent LP event
+ * for this wallet — used at READ time in `points.ts` to credit completed UTC
+ * days that have elapsed since with no LP event (carry-forward logic).
+ */
+export const lpPositionWallet = onchainTable("lp_position_wallet", (t) => ({
+  id: t.text().primaryKey(),         // {chainId}:{walletLower}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(), // checksum form (matches transactionSwap)
+  usdCents: t.bigint().notNull(),
+  lastEventTimestamp: t.bigint().notNull(),
+}));
+
+/**
+ * Existence = "wallet held ≥ MIN_LIQUIDITY_USD_CENTS of LP throughout this
+ * complete UTC day". One row per credited day per wallet. The LP handler
+ * inserts a row for every fully-covered day between two consecutive LP events.
+ *
+ * COUNT(*) per wallet gives the historical credited-days total. The live tail
+ * (days since `lastEventTimestamp` where the running value is still ≥ $10) is
+ * computed at read time and added on top.
+ */
+export const lpDayCredit = onchainTable("lp_day_credit", (t) => ({
+  id: t.text().primaryKey(),         // {chainId}:{walletLower}:{day}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),
+  day: t.bigint().notNull(),         // floor(timestamp / 86400)
+}));
+
+// ============ JUICE POINTS — DAILY BALANCE TRACKING ============
+
+/**
+ * Per-wallet running raw-token balance for the JUICE equity token. Updated
+ * on every Transfer event involving the wallet (sender debited, recipient
+ * credited; zero-address transfers are mints/burns and only touch one side).
+ *
+ * `balance` is in 18-decimal raw units. Convert to whole-JUICE in the API
+ * layer (floor(balance / 10^19) gives the daily JP credit since 10 JUICE = 1 JP).
+ */
+export const juiceHoldWallet = onchainTable("juice_hold_wallet", (t) => ({
+  id: t.text().primaryKey(),                    // {chainId}:{walletLower}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),            // checksum form
+  balance: t.bigint().notNull(),                // raw 18-decimal units
+  lastEventTimestamp: t.bigint().notNull(),
+}));
+
+/**
+ * Existence = "wallet held ≥ 10 JUICE (i.e. ≥ 1 JP/day worth) throughout
+ * this complete UTC day". `minJuiceUnits` is the minimum whole-JUICE count
+ * observed during the day — points credit = minJuiceUnits / 10. Min, not
+ * mean, so a single moment below the threshold breaks the day (anti-exploit).
+ */
+export const juiceHoldDayCredit = onchainTable("juice_hold_day_credit", (t) => ({
+  id: t.text().primaryKey(),                    // {chainId}:{walletLower}:{day}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),
+  day: t.bigint().notNull(),
+  minJuiceUnits: t.bigint().notNull(),          // whole JUICE (floor of raw / 1e18)
+}));
+
+/**
+ * Per-wallet running raw-token balance for svJUSD (savings vault receipt).
+ * 1 svJUSD ≈ 1 JUSD ≈ $1 for the points math; the small protocol-fee drift
+ * doesn't change the order of magnitude of the reward.
+ */
+export const savingsWallet = onchainTable("savings_wallet", (t) => ({
+  id: t.text().primaryKey(),                    // {chainId}:{walletLower}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),
+  balance: t.bigint().notNull(),                // raw 18-decimal svJUSD units
+  lastEventTimestamp: t.bigint().notNull(),
+}));
+
+export const savingsDayCredit = onchainTable("savings_day_credit", (t) => ({
+  id: t.text().primaryKey(),                    // {chainId}:{walletLower}:{day}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),
+  day: t.bigint().notNull(),
+  minJusdUnits: t.bigint().notNull(),           // whole JUSD (floor of raw / 1e18)
+}));
+
+/**
+ * Per-Position-contract running minted principal (debt) on the JUSD Minting
+ * Hub. The factory pattern in ponder.config.ts spawns one indexer per
+ * Position; this table aggregates their state.
+ */
+export const lendingPosition = onchainTable("lending_position", (t) => ({
+  id: t.text().primaryKey(),                    // {chainId}:{positionAddressLower}
+  chainId: t.integer().notNull(),
+  positionAddress: t.text().notNull(),
+  owner: t.text().notNull(),                    // borrower (checksum)
+  principalJusd: t.bigint().notNull(),          // raw 18-decimal JUSD units
+}));
+
+/**
+ * Per-borrower aggregate: sum of `principalJusd` across all of the wallet's
+ * open positions. Drives the daily JP credit at 5 JP per whole JUSD per day.
+ */
+export const lendingWallet = onchainTable("lending_wallet", (t) => ({
+  id: t.text().primaryKey(),                    // {chainId}:{walletLower}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),
+  totalPrincipalJusd: t.bigint().notNull(),
+  lastEventTimestamp: t.bigint().notNull(),
+}));
+
+export const lendingDayCredit = onchainTable("lending_day_credit", (t) => ({
+  id: t.text().primaryKey(),                    // {chainId}:{walletLower}:{day}
+  chainId: t.integer().notNull(),
+  walletAddress: t.text().notNull(),
+  day: t.bigint().notNull(),
+  minJusdUnits: t.bigint().notNull(),           // whole JUSD (floor of raw / 1e18)
+}));
+
 // ============ LAUNCHPAD SCHEMA ============
 
 export const launchpadToken = onchainTable("launchpadToken", (t) => ({

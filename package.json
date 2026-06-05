@@ -11,7 +11,8 @@
     "build": "ponder codegen",
     "api": "tsx src/api/index.ts",
     "api:dev": "tsx watch src/api/index.ts",
-    "test": "echo \"Warning: no test specified\" && exit 0"
+    "test": "vitest run",
+    "test:points": "vitest run test/points"
   },
   "repository": {
     "type": "git",
@@ -48,6 +49,7 @@
     "@types/node": "^24.5.2",
     "eslint": "^8.53.0",
     "eslint-config-ponder": "^0.13.1",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.6"
   }
 }
