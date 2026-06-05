@@ -2,7 +2,8 @@
  * Points API controller - endpoints powering the JuiceSwap "Juice Points" UI.
  *
  *   GET /points/:address          -> PointsBreakdown for this wallet
- *   GET /points/leaderboard       -> Top N wallets ranked by swap points
+ *   GET /points/leaderboard       -> Top N wallets ranked by TOTAL points
+ *                                    (reconciles with each wallet's breakdown)
  *
  * The aggregation logic lives in `pointsCompute.ts` (pure, db-injected) so it
  * can be tested against a real Postgres without the Ponder runtime. This file

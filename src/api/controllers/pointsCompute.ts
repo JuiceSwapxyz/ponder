@@ -415,15 +415,36 @@ export async function buildBreakdown(
 }
 
 /**
- * Top-N wallets by swap points. Raw CTE so aggregation stays in Postgres.
- * Rank uses ONLY swap points by design (LP-only wallets excluded).
+ * Top-N wallets by TOTAL points — the same number `buildBreakdown` reports per
+ * wallet, so the leaderboard reconciles exactly with each wallet's own page:
+ *
+ *   swaps      daily-capped swap points (finality-filtered)
+ *   liquidity  (lp_day_credit COUNT + live tail) × POINTS_PER_LIQUIDITY_DAY
+ *   holds      savings ×1 / juiceHold floor(units/10) / lending ×5, each as
+ *              historical SUM(minUnits) + whole-balance × live-tail days
+ *   bonuses    one-time create (+500) / graduate (+10,000) on the campaign chain
+ *
+ * Live-tail day math mirrors `computeLpPoints` / `computeDailyHoldStream`
+ * exactly: dMin = ceil(lastEventTimestamp / day), dMax = floor(now / day) - 1,
+ * days = clamp(dMax - dMin + 1, 0, LIVE_TAIL_CAP_DAYS). `nowSec` is computed in
+ * JS (not NOW()) so the fake-timer test harness pins it deterministically.
+ *
+ * One CTE per category UNION ALLed into a per-wallet SUM. Aggregation is keyed
+ * on LOWER(addr) so a casing mismatch between tables can never split a wallet.
+ * Full-table scan by design — results sit behind the 30s leaderboard cache.
  */
 export async function computeLeaderboard(
   db: PointsDb,
   finalityCutoff: bigint,
 ): Promise<LeaderboardEntry[]> {
+  const nowSec = Math.floor(Date.now() / 1_000);
+
   const rawResult: any = await db.execute(sql`
-    WITH daily_counts AS (
+    WITH params AS (
+      -- d_max: last fully-completed UTC day. Bound once, reused by every tail.
+      SELECT (FLOOR(${nowSec}::numeric / ${SECONDS_PER_DAY}) - 1)::numeric AS d_max
+    ),
+    swap_daily AS (
       SELECT
         ${transactionSwap.swapperAddress} AS addr,
         FLOOR(${transactionSwap.blockTimestamp} / ${SECONDS_PER_DAY}) AS day,
@@ -435,14 +456,140 @@ export async function computeLeaderboard(
       -- GROUP BY expression would not match the projection and Postgres would
       -- reject the query (SQLSTATE 42803).
       GROUP BY 1, 2
+    ),
+    swap_pts AS (
+      SELECT addr, SUM(LEAST(n * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY}))::numeric AS pts
+      FROM swap_daily
+      GROUP BY addr
+    ),
+    lp_days AS (
+      SELECT ${lpDayCredit.walletAddress} AS addr, COUNT(*)::numeric AS days
+      FROM ${lpDayCredit}
+      GROUP BY 1
+      UNION ALL
+      SELECT
+        ${lpPositionWallet.walletAddress} AS addr,
+        LEAST(
+          ${LIVE_TAIL_CAP_DAYS}::numeric,
+          GREATEST(
+            0::numeric,
+            (SELECT d_max FROM params)
+              - CEIL(${lpPositionWallet.lastEventTimestamp} / ${SECONDS_PER_DAY}::numeric)
+              + 1
+          )
+        ) AS days
+      FROM ${lpPositionWallet}
+      WHERE ${lpPositionWallet.usdCents} >= ${MIN_LIQUIDITY_USD_CENTS}
+        AND ${lpPositionWallet.lastEventTimestamp} > 0
+    ),
+    lp_pts AS (
+      SELECT addr, SUM(days) * ${POINTS_PER_LIQUIDITY_DAY} AS pts FROM lp_days GROUP BY addr
+    ),
+    -- Hold streams: token-day units = historical SUM(minUnits) + live tail
+    -- (whole-token balance × completed days since the last event).
+    sav_units AS (
+      SELECT ${savingsDayCredit.walletAddress} AS addr, SUM(${savingsDayCredit.minJusdUnits})::numeric AS units
+      FROM ${savingsDayCredit}
+      GROUP BY 1
+      UNION ALL
+      SELECT
+        ${savingsWallet.walletAddress} AS addr,
+        FLOOR(${savingsWallet.balance} / 1000000000000000000::numeric)
+          * LEAST(
+              ${LIVE_TAIL_CAP_DAYS}::numeric,
+              GREATEST(
+                0::numeric,
+                (SELECT d_max FROM params)
+                  - CEIL(${savingsWallet.lastEventTimestamp} / ${SECONDS_PER_DAY}::numeric)
+                  + 1
+              )
+            ) AS units
+      FROM ${savingsWallet}
+      WHERE ${savingsWallet.balance} >= 1000000000000000000::numeric
+        AND ${savingsWallet.lastEventTimestamp} > 0
+    ),
+    sav_pts AS (
+      SELECT addr, SUM(units) * ${POINTS_PER_JUSD_SAVED_PER_DAY}::numeric AS pts
+      FROM sav_units GROUP BY addr
+    ),
+    juice_units AS (
+      SELECT ${juiceHoldDayCredit.walletAddress} AS addr, SUM(${juiceHoldDayCredit.minJuiceUnits})::numeric AS units
+      FROM ${juiceHoldDayCredit}
+      GROUP BY 1
+      UNION ALL
+      SELECT
+        ${juiceHoldWallet.walletAddress} AS addr,
+        FLOOR(${juiceHoldWallet.balance} / 1000000000000000000::numeric)
+          * LEAST(
+              ${LIVE_TAIL_CAP_DAYS}::numeric,
+              GREATEST(
+                0::numeric,
+                (SELECT d_max FROM params)
+                  - CEIL(${juiceHoldWallet.lastEventTimestamp} / ${SECONDS_PER_DAY}::numeric)
+                  + 1
+              )
+            ) AS units
+      FROM ${juiceHoldWallet}
+      WHERE ${juiceHoldWallet.balance} >= 1000000000000000000::numeric
+        AND ${juiceHoldWallet.lastEventTimestamp} > 0
+    ),
+    juice_pts AS (
+      -- Integer division on the COMBINED unit total, matching
+      -- computeDailyHoldStream: floor(totalUnits / divisor) * rate.
+      SELECT addr, FLOOR(SUM(units) / ${JUICE_PER_POINT}::numeric) * ${POINTS_PER_JUICE_PER_DAY}::numeric AS pts
+      FROM juice_units GROUP BY addr
+    ),
+    lend_units AS (
+      SELECT ${lendingDayCredit.walletAddress} AS addr, SUM(${lendingDayCredit.minJusdUnits})::numeric AS units
+      FROM ${lendingDayCredit}
+      GROUP BY 1
+      UNION ALL
+      SELECT
+        ${lendingWallet.walletAddress} AS addr,
+        FLOOR(${lendingWallet.totalPrincipalJusd} / 1000000000000000000::numeric)
+          * LEAST(
+              ${LIVE_TAIL_CAP_DAYS}::numeric,
+              GREATEST(
+                0::numeric,
+                (SELECT d_max FROM params)
+                  - CEIL(${lendingWallet.lastEventTimestamp} / ${SECONDS_PER_DAY}::numeric)
+                  + 1
+              )
+            ) AS units
+      FROM ${lendingWallet}
+      WHERE ${lendingWallet.totalPrincipalJusd} >= 1000000000000000000::numeric
+        AND ${lendingWallet.lastEventTimestamp} > 0
+    ),
+    lend_pts AS (
+      SELECT addr, SUM(units) * ${POINTS_PER_USD_LENT_PER_DAY}::numeric AS pts
+      FROM lend_units GROUP BY addr
+    ),
+    meme_pts AS (
+      SELECT
+        ${launchpadToken.creator} AS addr,
+        (${POINTS_PER_MEME_TOKEN_CREATED}
+          + CASE WHEN BOOL_OR(${launchpadToken.graduated}) THEN ${POINTS_PER_MEME_TOKEN_GRADUATED} ELSE 0 END
+        )::numeric AS pts
+      FROM ${launchpadToken}
+      WHERE ${launchpadToken.chainId} = ${JUICER_CAMPAIGN_CHAIN_ID}
+      GROUP BY 1
+    ),
+    totals AS (
+      SELECT LOWER(addr) AS addr, SUM(pts) AS pts
+      FROM (
+        SELECT addr, pts FROM swap_pts
+        UNION ALL SELECT addr, pts FROM lp_pts
+        UNION ALL SELECT addr, pts FROM sav_pts
+        UNION ALL SELECT addr, pts FROM juice_pts
+        UNION ALL SELECT addr, pts FROM lend_pts
+        UNION ALL SELECT addr, pts FROM meme_pts
+      ) cats
+      GROUP BY 1
     )
-    SELECT
-      addr,
-      SUM(LEAST(n * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY}))::bigint AS points
-    FROM daily_counts
-    GROUP BY addr
-    HAVING SUM(LEAST(n * ${POINTS_PER_SWAP}, ${MAX_SWAP_POINTS_PER_DAY})) > 0
-    ORDER BY points DESC
+    SELECT addr, pts::bigint AS points
+    FROM totals
+    WHERE pts > 0
+    ORDER BY pts DESC, addr ASC
     LIMIT ${LEADERBOARD_LIMIT}
   `);
 

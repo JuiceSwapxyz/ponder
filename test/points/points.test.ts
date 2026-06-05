@@ -243,6 +243,68 @@ describe("computeLeaderboard", () => {
       { rank: 2, address: WALLET2.toLowerCase(), points: 200 },
     ]);
   });
+
+  it("ranks by TOTAL points and reconciles with buildBreakdown per wallet", async () => {
+    const cutoff = 968n;
+    const WALLET3 = "0x3333333333333333333333333333333333333333";
+
+    // WALLET: swaps only -> 3 swaps = 300.
+    for (let i = 0; i < 3; i++) {
+      await insertSwap({ id: `lb1-${i}`, wallet: WALLET, blockNumber: 100, day: DAY_NOW - 5 });
+    }
+
+    // WALLET2: LP-only, zero swaps. 1 historical day + 3 live days = 4 * 50 = 200.
+    await db.execute(sql`
+      INSERT INTO "lp_day_credit" ("id","chainId","walletAddress","day")
+      VALUES (${`lb2-lp`}, ${CHAIN}, ${WALLET2}, ${DAY_NOW - 9})
+    `);
+    await db.execute(sql`
+      INSERT INTO "lp_position_wallet" ("id","chainId","walletAddress","usdCents","lastEventTimestamp")
+      VALUES (${`${CHAIN}:${WALLET2}`}, ${CHAIN}, ${WALLET2}, 1500, ${LAST_TS_3D_AGO})
+    `);
+
+    // WALLET3: launchpad create+graduate only -> 10,500. Highest total.
+    await db.execute(sql`
+      INSERT INTO "launchpadToken" ("id","address","chainId","name","symbol","creator","graduated")
+      VALUES (${"lb3-t"}, ${"0xccc"}, ${CHAIN}, ${"Meme"}, ${"MEME"}, ${WALLET3}, true)
+    `);
+
+    const entries = await computeLeaderboard(db, cutoff);
+
+    // Ranking order is by total, and LP-only / bonus-only wallets are included.
+    expect(entries).toEqual([
+      { rank: 1, address: WALLET3.toLowerCase(), points: 10_500 },
+      { rank: 2, address: WALLET.toLowerCase(), points: 300 },
+      { rank: 3, address: WALLET2.toLowerCase(), points: 200 },
+    ]);
+
+    // Each leaderboard total equals that wallet's own buildBreakdown total.
+    for (const entry of entries) {
+      const checksum =
+        entry.address === WALLET.toLowerCase()
+          ? WALLET
+          : entry.address === WALLET2.toLowerCase()
+            ? WALLET2
+            : WALLET3;
+      const bd = await buildBreakdown(db, checksum, cutoff);
+      expect(entry.points).toBe(bd.total);
+    }
+  });
+
+  it("combines hold-stream live tails into the ranked total (juice integer division)", async () => {
+    const cutoff = 968n;
+    // 55 JUICE held, last event 3 days ago, no historical day-credit.
+    // live = 55 * 3 = 165 JUICE-days -> floor(165/10) = 16 JP.
+    await db.execute(sql`
+      INSERT INTO "juice_hold_wallet" ("id","chainId","walletAddress","balance","lastEventTimestamp")
+      VALUES (${`${CHAIN}:${WALLET}`}, ${CHAIN}, ${WALLET}, ${55n * ONE_TOKEN}, ${LAST_TS_3D_AGO})
+    `);
+
+    const entries = await computeLeaderboard(db, cutoff);
+    const bd = await buildBreakdown(db, WALLET, cutoff);
+    expect(entries).toEqual([{ rank: 1, address: WALLET.toLowerCase(), points: 16 }]);
+    expect(entries[0].points).toBe(bd.total);
+  });
 });
 
 describe("buildBreakdown", () => {
