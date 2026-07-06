@@ -1,7 +1,7 @@
 {
   "name": "juiceswap-ponder",
   "version": "1.0.0",
-  "description": "JuiceSwap Campaign API - Ponder indexer for Citrea Testnet",
+  "description": "JuiceSwap Campaign API - Ponder indexer for Citrea",
   "main": "index.js",
   "type": "module",
   "scripts": {
