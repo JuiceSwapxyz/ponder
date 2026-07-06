@@ -29,9 +29,9 @@ campaing.get("/progress", async (c) => {
     }
 
     const chainIdNum = Number(chainId);
-    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
+    if (chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
+        { error: "Only Citrea mainnet (4114) supported" },
         400
       );
     }
@@ -154,9 +154,9 @@ campaing.post("/progress", async (c) => {
     }
 
     const chainIdNum = Number(chainId);
-    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
+    if (chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
+        { error: "Only Citrea mainnet (4114) supported" },
         400
       );
     }
@@ -272,7 +272,7 @@ campaing.get("/health", async (c) => {
   return c.json({
     status: "OK",
     timestamp: new Date().toISOString(),
-    chains: ["citreaTestnet", "citrea"],
+    chains: ["citrea"],
     features: ["campaign-progress"],
     version: "1.0.7",
   });
@@ -281,12 +281,12 @@ campaing.get("/health", async (c) => {
 // Get all registered addresses with campaign progress
 campaing.get("/addresses", async (c: Context) => {
   try {
-    const chainId = c.req.query("chainId") || "5115";
+    const chainId = c.req.query("chainId") || "4114";
 
     const chainIdNum = Number(chainId);
-    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
+    if (chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
+        { error: "Only Citrea mainnet (4114) supported" },
         400
       );
     }
@@ -353,12 +353,12 @@ campaing.get("/addresses", async (c: Context) => {
 // Campaign statistics endpoint
 campaing.get("/stats", async (c: Context) => {
   try {
-    const chainId = c.req.query("chainId") || "5115";
+    const chainId = c.req.query("chainId") || "4114";
 
     const chainIdNum = Number(chainId);
-    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
+    if (chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
+        { error: "Only Citrea mainnet (4114) supported" },
         400
       );
     }
@@ -401,13 +401,13 @@ campaing.get("/stats", async (c: Context) => {
 // Campaign daily growth endpoint for charts
 campaing.get("/daily-growth", async (c: Context) => {
   try {
-    const chainId = c.req.query("chainId") || "5115";
+    const chainId = c.req.query("chainId") || "4114";
     const days = parseInt(c.req.query("days") || "30");
 
     const chainIdNum = Number(chainId);
-    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
+    if (chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
+        { error: "Only Citrea mainnet (4114) supported" },
         400
       );
     }
@@ -498,13 +498,13 @@ campaing.get("/daily-growth", async (c: Context) => {
 // Campaign hourly activity endpoint for real-time monitoring
 campaing.get("/hourly-activity", async (c: Context) => {
   try {
-    const chainId = c.req.query("chainId") || "5115";
+    const chainId = c.req.query("chainId") || "4114";
     const hours = parseInt(c.req.query("hours") || "24");
 
     const chainIdNum = Number(chainId);
-    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
+    if (chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
+        { error: "Only Citrea mainnet (4114) supported" },
         400
       );
     }
@@ -576,13 +576,13 @@ campaing.get("/hourly-activity", async (c: Context) => {
 
 campaing.get("/hourly-completion-stats", async (c: Context) => {
   try {
-    const chainId = c.req.query("chainId") || "5115";
+    const chainId = c.req.query("chainId") || "4114";
     const hours = parseInt(c.req.query("hours") || "168"); // Last 7 days by default
 
     const chainIdNum = Number(chainId);
-    if (chainIdNum !== 5115 && chainIdNum !== 4114) {
+    if (chainIdNum !== 4114) {
       return c.json(
-        { error: "Only Citrea testnet (5115) or mainnet (4114) supported" },
+        { error: "Only Citrea mainnet (4114) supported" },
         400
       );
     }

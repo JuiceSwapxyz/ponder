@@ -69,7 +69,7 @@ app.get("/api/info", async (c: Context) => {
     name: "JuiceSwap Ponder",
     version: "1.0.7",
     chain: "multi",
-    supportedChains: ["citreaTestnet", "citrea"],
+    supportedChains: ["citrea"],
     contracts: {
       CBTCNUSDPool: "0x6006797369E2A595D31Df4ab3691044038AAa7FE",
       CBTCcUSDPool: "0xA69De906B9A830Deb64edB97B2eb0848139306d2",
@@ -116,7 +116,7 @@ app.get("/api/sync-status", async (c: Context) => {
 
     // Get current block number from Citrea RPC
     try {
-      const rpcUrl = process.env.CITREA_RPC_URL ?? 'https://rpc.testnet.juiceswap.com/';
+      const rpcUrl = process.env.CITREA_RPC_URL ?? 'https://rpc.citreascan.com/';
 
       // Add 10 second timeout to RPC call
       const controller = new AbortController();
