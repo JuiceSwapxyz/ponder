@@ -18,11 +18,11 @@ Content-Type: application/json
 {
     "contracts": [
         {
-            "chainId": 5115,
+            "chainId": 4114,
             "address": "0x2ffc18ac99d367b70dd922771df8c2074af4ace0"
         },
         {
-            "chainId": 5115,
+            "chainId": 4114,
             "address": "0x36c16eac6b0ba6c50f494914ff015fca95b7835f"
         }
     ]
